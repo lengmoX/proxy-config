@@ -102,7 +102,7 @@ tun:
   enable: true
   # system/gvisor/mixed
   stack: mixed
-  dns-hijack: ["any:53", "tcp://any:53"]
+  dns-hijack: ["any:53","tcp://any:53","any:853","tcp://any:853"]
   auto-route: true
   auto-redirect: true
   auto-detect-interface: true
@@ -171,7 +171,7 @@ dns:
   
 # 出站策略
 # 注意锚点必须放在引用的上方，可以集中把锚点全部放yaml的顶部。
-pr: &pr { type: select, proxies: [🚀 默认代理, 🌐 全部节点, 直连], <<: *A }
+pr: &pr { type: select, proxies: [🚀 默认代理, 🌐 全部节点, 🇭🇰 香港节点, 🇹🇼 台湾节点, 🇯🇵 日本节点, 🇸🇬 狮城节点, 🇺🇸 美国节点, 直连], <<: *A }
 proxy-groups:
   - {
       name: 🚀 默认代理,
@@ -180,7 +180,7 @@ proxy-groups:
       proxies: [🌐 全部节点],
     }
   - { name: 🌐 全部节点, type: select, include-all: true }
-  - { name: 🤖 ChatGPT, type: select, include-all: true }
+  - { name: 🤖 ChatGPT, type: select, proxies: [🚀 默认代理, 🇭🇰 香港节点,  🇹🇼 台湾节点, 🇯🇵 日本节点, 🇸🇬 狮城节点, 🇺🇸 美国节点,🌐 全部节点], include-all: true }
   - { name: 🔗 链式代理基点, type: select, use: [3.额外地址] }
   - { name: 🔄 订阅更新, type: select, proxies: [直连, 🚀 默认代理] }
   - { name: 📹 PikPak, <<: *pr }
@@ -198,6 +198,7 @@ proxy-groups:
   - { name: 🎯 直连, type: select, proxies: [直连, 🚀 默认代理] }
   - { name: 🐟 漏网之鱼, <<: *pr }
   - {name: 🇭🇰 香港节点, type: select, include-all: true, filter: "(?=.*(🇭🇰|港|HK|(?i)Hong))^((?!(落地|自建|台|日|韩|新|深|美)).)*$"}
+  - {name: 🇹🇼 台湾节点, type: select, include-all: true, filter: "(?=.*(🇹🇼|台|TW|(?i)Taiwan))^((?!(落地|自建|港|日|韩|新|深|美)).)*$"}
   - {name: 🇯🇵 日本节点, type: select, include-all: true, filter: "(?=.*(🇯🇵|日|JP|(?i)Japan))^((?!(落地|自建|港|台|韩|新|美)).)*$"}
   - {name: 🇸🇬 狮城节点, type: select, include-all: true, filter: "(?=.*(🇸🇬|新加坡|坡|狮城|SG|Singapore))^((?!(落地|自建|台|日|韩|深|美)).)*$"}
   - {name: 🇺🇸 美国节点, type: select, include-all: true, filter: "(?=.*(🇺🇸|美|US|(?i)States|America))^((?!(落地|自建|港|台|韩|新|日)).)*$"}
