@@ -268,7 +268,10 @@
         "🚀 节点选择",
         "🌐 全部节点",
         "🎯 全球直连"
-      ]
+      ],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "10m",
+      "tolerance": 50
     },
     {
       "tag": "GLOBAL",
@@ -586,7 +589,7 @@
     {
       "type": "mixed",
       "listen": "127.0.0.1",
-      "listen_port": 7890
+      "listen_port": 7891
     }
   ],
   "experimental": {
