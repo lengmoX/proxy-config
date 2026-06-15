@@ -66,7 +66,7 @@ tcp-concurrent: true
 log-level: warning
 find-process-mode: "strict"
 # interface-name: en0
-global-client-fingerprint: chrome
+# global-client-fingerprint: chrome
 keep-alive-idle: 600
 keep-alive-interval: 15
 disable-keep-alive: false
@@ -181,7 +181,7 @@ proxy-groups:
     }
   - { name: 🌐 全部节点, type: select, include-all: true }
   - { name: 🤖 ChatGPT, type: select, proxies: [🚀 默认代理, 🇭🇰 香港节点,  🇹🇼 台湾节点, 🇯🇵 日本节点, 🇸🇬 狮城节点, 🇺🇸 美国节点,🌐 全部节点], include-all: true }
-  - { name: 🔗 链式代理基点, type: select, use: [3.额外地址] }
+  - { name: 🔗 链式代理基点, type: select, use: [1.主要地址] }
   - { name: 🔄 订阅更新, type: select, proxies: [直连, 🚀 默认代理] }
   - { name: 📹 PikPak, <<: *pr }
   - { name: 📹 YouTube, <<: *pr }
