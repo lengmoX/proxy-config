@@ -229,18 +229,8 @@ function ensureLandingGroups(config, proxies, landingRegex) {
     { tag: LANDING_GROUP, type: "selector", outbounds: landingTags.length > 0 ? landingTags : ["🎯 全球直连"] }
   ];
 
-  for (const group of groups) {
-    const existing = config.outbounds.find((outbound) => outbound && outbound.tag === group.tag);
-    if (existing) {
-      existing.type = "selector";
-      existing.outbounds = group.outbounds;
-    }
-  }
-
-  const missingGroups = groups.filter((group) => !config.outbounds.some((outbound) => outbound && outbound.tag === group.tag));
-  if (missingGroups.length > 0) {
-    insertOutboundsAfter(config.outbounds, "🤖 AI", missingGroups);
-  }
+  removeOutbounds(config.outbounds, [FRONT_PROXY_GROUP, LANDING_GROUP]);
+  insertOutboundsAfter(config.outbounds, "🤖 AI", groups);
 
   appendToSelector(config, "GLOBAL", [FRONT_PROXY_GROUP, LANDING_GROUP], "🍃 延迟辅助");
   log(`landing enabled: ${landingTags.length} landing node(s), ${frontTags.length} front node(s)`);
@@ -253,6 +243,16 @@ function insertOutboundsAfter(outbounds, tag, items) {
     return;
   }
   outbounds.splice(index + 1, 0, ...items);
+}
+
+function removeOutbounds(outbounds, tags) {
+  const tagSet = new Set(tags);
+  for (let index = outbounds.length - 1; index >= 0; index--) {
+    const outbound = outbounds[index];
+    if (outbound && tagSet.has(outbound.tag)) {
+      outbounds.splice(index, 1);
+    }
+  }
 }
 
 function appendToSelector(config, tag, values, beforeTag) {
