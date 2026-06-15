@@ -232,7 +232,7 @@ function ensureLandingGroups(config, proxies, landingRegex) {
   removeOutbounds(config.outbounds, [FRONT_PROXY_GROUP, LANDING_GROUP]);
   insertOutboundsAfter(config.outbounds, "🤖 AI", groups);
 
-  appendToSelector(config, "GLOBAL", [FRONT_PROXY_GROUP, LANDING_GROUP], "🍃 延迟辅助");
+  insertIntoSelectorAfter(config, "GLOBAL", "🤖 AI", [FRONT_PROXY_GROUP, LANDING_GROUP]);
   log(`landing enabled: ${landingTags.length} landing node(s), ${frontTags.length} front node(s)`);
 }
 
@@ -255,19 +255,22 @@ function removeOutbounds(outbounds, tags) {
   }
 }
 
-function appendToSelector(config, tag, values, beforeTag) {
+function insertIntoSelectorAfter(config, tag, afterTag, values) {
   const selector = config.outbounds.find((outbound) => outbound && outbound.tag === tag && outbound.type === "selector");
   if (!selector) return;
   selector.outbounds = Array.isArray(selector.outbounds) ? selector.outbounds : [];
 
+  const valueSet = new Set(values);
+  selector.outbounds = selector.outbounds.filter((outbound) => !valueSet.has(outbound));
+
+  const afterIndex = selector.outbounds.indexOf(afterTag);
+  if (afterIndex === -1) {
+    selector.outbounds.push(...values);
+    return;
+  }
+
   for (const value of values) {
-    if (selector.outbounds.includes(value)) continue;
-    const beforeIndex = beforeTag ? selector.outbounds.indexOf(beforeTag) : -1;
-    if (beforeIndex === -1) {
-      selector.outbounds.push(value);
-    } else {
-      selector.outbounds.splice(beforeIndex, 0, value);
-    }
+    selector.outbounds.splice(afterIndex + 1 + values.indexOf(value), 0, value);
   }
 }
 
