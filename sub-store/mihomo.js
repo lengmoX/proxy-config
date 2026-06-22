@@ -13,6 +13,7 @@
 
 const FRONT_PROXY_GROUP = '🔗 前置代理';
 const LANDING_GROUP = '🛬 落地节点';
+const BACKGROUND_TEST_GROUP = '📊 延迟测试';
 const DEFAULT_LANDING_FILTER = '家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|链式|Minor';
 
 function main(config) {
@@ -180,6 +181,16 @@ function createRegionGroups(nodeNames, chainRegex) {
 
 function createProxyGroups(nodeNames, regionGroups, policyChoices, chainGroups) {
   const allNodeGroup = { name: '🌐 全部节点', type: 'select', proxies: nodeNames };
+  const backgroundTestGroup = {
+    name: BACKGROUND_TEST_GROUP,
+    type: 'url-test',
+    proxies: nodeNames,
+    url: 'https://www.gstatic.com/generate_204',
+    interval: 300,
+    tolerance: 100,
+    hidden: true,
+    lazy: false,
+  };
   const policy = (name) => ({ name, type: 'select', proxies: policyChoices });
 
   return [
@@ -202,6 +213,7 @@ function createProxyGroups(nodeNames, regionGroups, policyChoices, chainGroups) 
     { name: '🍎 Apple', type: 'select', proxies: ['直连', '🚀 默认代理'] },
     { name: '🎯 直连', type: 'select', proxies: ['直连', '🚀 默认代理'] },
     policy('🐟 漏网之鱼'),
+    backgroundTestGroup,
     ...regionGroups,
   ];
 }
