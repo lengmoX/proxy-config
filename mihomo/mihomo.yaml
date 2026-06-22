@@ -3,8 +3,7 @@ A: &A
   filter: "^(?!.*(套餐|重置|剩余|到期|订阅|群|账户|流量|有效期|时间|官网|失联|余额)).*$"
   use:
     - 1.主要地址
-    - 2.备用地址
-    - 3.额外地址
+    - 2.落地地址
 
 # 健康检查
 p: &p
@@ -25,28 +24,19 @@ p: &p
       - "clash.meta"
 
 proxy-providers: # ← 此函数位置请勿变动！此为模块更新时备份恢复订阅变量范围 ↓
-  1.主要地址: # 直接使用
+  1.主要地址: # 前置/普通节点
     <<: *p
-    # override:
-    #   additional-prefix: "Main："
+    filter: "^(?!.*(套餐|重置|剩余|到期|订阅|群|账户|流量|有效期|时间|官网|失联|余额|家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|链式|Minor)).*$"
     path: ./proxies/Provider1.yaml
-    # url: "http://127.0.0.1:38324/download/one?target=ClashMeta"
-    url: ""
+    url: &sub_url ""
 
-  2.备用地址: # 需要前置
+  2.落地地址: # 落地节点，使用相同订阅但设置 dialer-proxy
     <<: *p
+    url: *sub_url
+    filter: '(?i)(?=.*(家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|链式|Minor))^((?!(套餐|重置|剩余|到期|订阅|群|账户|流量|有效期|时间|官网|失联|余额)).)*$'
     override:
-      dialer-proxy: 🔗 链式代理基点
-    #   additional-prefix: "Minor："
+      dialer-proxy: 🔗 前置代理
     path: ./proxies/Provider2.yaml
-    url: ""
-
-  3.额外地址: # 机场
-    <<: *p
-    # override:
-    #   additional-prefix: "Additi："
-    path: ./proxies/Provider3.yaml
-    url: ""
 
 # 节点信息
 proxies:
@@ -171,7 +161,7 @@ dns:
   
 # 出站策略
 # 注意锚点必须放在引用的上方，可以集中把锚点全部放yaml的顶部。
-pr: &pr { type: select, proxies: [🚀 默认代理, 🌐 全部节点, 🇭🇰 香港节点, 🇹🇼 台湾节点, 🇯🇵 日本节点, 🇸🇬 狮城节点, 🇺🇸 美国节点, 直连], <<: *A }
+pr: &pr { type: select, proxies: [🚀 默认代理, 🌐 全部节点, 🇭🇰 香港, 🇹🇼 台湾, 🇸🇬 新加坡, 🇯🇵 日本, 🇺🇸 美国, 🛬 落地节点, 直连] }
 proxy-groups:
   - {
       name: 🚀 默认代理,
@@ -180,8 +170,9 @@ proxy-groups:
       proxies: [🌐 全部节点],
     }
   - { name: 🌐 全部节点, type: select, include-all: true }
-  - { name: 🤖 ChatGPT, type: select, proxies: [🚀 默认代理, 🇭🇰 香港节点,  🇹🇼 台湾节点, 🇯🇵 日本节点, 🇸🇬 狮城节点, 🇺🇸 美国节点,🌐 全部节点], include-all: true }
-  - { name: 🔗 链式代理基点, type: select, use: [1.主要地址] }
+  - { name: 🤖 AI, <<: *pr }
+  - { name: 🔗 前置代理, type: select, include-all: true, use: [1.主要地址], proxies: [🌐 全部节点, 直连] }
+  - { name: 🛬 落地节点, type: select, include-all: true, use: [2.落地地址], proxies: [🌐 全部节点, 直连] }
   - { name: 🔄 订阅更新, type: select, proxies: [直连, 🚀 默认代理] }
   - { name: 📹 PikPak, <<: *pr }
   - { name: 📹 YouTube, <<: *pr }
@@ -197,11 +188,11 @@ proxy-groups:
   - { name: 🍎 Apple, type: select, proxies: [直连, 🚀 默认代理] }
   - { name: 🎯 直连, type: select, proxies: [直连, 🚀 默认代理] }
   - { name: 🐟 漏网之鱼, <<: *pr }
-  - {name: 🇭🇰 香港节点, type: select, include-all: true, filter: "(?=.*(🇭🇰|港|HK|(?i)Hong))^((?!(落地|自建|台|日|韩|新|深|美)).)*$"}
-  - {name: 🇹🇼 台湾节点, type: select, include-all: true, filter: "(?=.*(🇹🇼|台|TW|(?i)Taiwan))^((?!(落地|自建|港|日|韩|新|深|美)).)*$"}
-  - {name: 🇯🇵 日本节点, type: select, include-all: true, filter: "(?=.*(🇯🇵|日|JP|(?i)Japan))^((?!(落地|自建|港|台|韩|新|美)).)*$"}
-  - {name: 🇸🇬 狮城节点, type: select, include-all: true, filter: "(?=.*(🇸🇬|新加坡|坡|狮城|SG|Singapore))^((?!(落地|自建|台|日|韩|深|美)).)*$"}
-  - {name: 🇺🇸 美国节点, type: select, include-all: true, filter: "(?=.*(🇺🇸|美|US|(?i)States|America))^((?!(落地|自建|港|台|韩|新|日)).)*$"}
+  - { name: 🇭🇰 香港, type: select, include-all: true, filter: '(?i)(?=.*(🇭🇰|港|\bHK\b|Hong\s*Kong|HongKong))^((?!(落地|自建|台|日|韩|新|深|美|家宽|家庭宽带|商宽|商业宽带|星链|Starlink|链式|Minor)).)*$' }
+  - { name: 🇹🇼 台湾, type: select, include-all: true, filter: '(?i)(?=.*(🇹🇼|台|\bTW\b|Taiwan|台灣|臺灣))^((?!(落地|自建|港|日|韩|新|深|美|家宽|家庭宽带|商宽|商业宽带|星链|Starlink|链式|Minor)).)*$' }
+  - { name: 🇸🇬 新加坡, type: select, include-all: true, filter: '(?i)(?=.*(🇸🇬|新加坡|坡|狮城|\bSG\b|Singapore))^((?!(落地|自建|台|日|韩|深|美|家宽|家庭宽带|商宽|商业宽带|星链|Starlink|链式|Minor)).)*$' }
+  - { name: 🇯🇵 日本, type: select, include-all: true, filter: '(?i)(?=.*(🇯🇵|日|\bJP\b|Japan|东京|大阪))^((?!(落地|自建|港|台|韩|新|美|家宽|家庭宽带|商宽|商业宽带|星链|Starlink|链式|Minor)).)*$' }
+  - { name: 🇺🇸 美国, type: select, include-all: true, filter: '(?i)(?=.*(🇺🇸|美|\bUS\b|States|America|United\s*States|洛杉矶|硅谷|西雅图))^((?!(落地|自建|港|台|韩|新|日|家宽|家庭宽带|商宽|商业宽带|星链|Starlink|链式|Minor)).)*$' }
 
 # 规则匹配
 # 此规则部分没有做防泄露处理，因为弊严重大于利！
@@ -215,7 +206,7 @@ rules:
   - RULE-SET,apple_domain,🍎 Apple
   - RULE-SET,proxylite,🚀 默认代理
   - RULE-SET,cloudflare,🚀 默认代理
-  - RULE-SET,ai,🤖 ChatGPT
+  - RULE-SET,ai,🤖 AI
   - DOMAIN-SUFFIX,mypikpak.com,📹 PikPak
   - RULE-SET,github_domain,👨🏿‍💻 GitHub
   - RULE-SET,youtube_domain,📹 YouTube

@@ -185,7 +185,7 @@ function createProxyGroups(nodeNames, regionGroups, policyChoices, chainGroups) 
   return [
     { name: '🚀 默认代理', type: 'select', proxies: unique(['🌐 全部节点', ...nodeNames]) },
     allNodeGroup,
-    policy('🤖 ChatGPT'),
+    policy('🤖 AI'),
     ...chainGroups.groups,
     { name: '🔄 订阅更新', type: 'select', proxies: ['直连', '🚀 默认代理'] },
     policy('📹 PikPak'),
@@ -286,7 +286,7 @@ function createRules() {
     'RULE-SET,apple_domain,🍎 Apple',
     'RULE-SET,proxylite,🚀 默认代理',
     'RULE-SET,cloudflare,🚀 默认代理',
-    'RULE-SET,ai,🤖 ChatGPT',
+    'RULE-SET,ai,🤖 AI',
     'DOMAIN-SUFFIX,mypikpak.com,📹 PikPak',
     'RULE-SET,github_domain,👨🏿‍💻 GitHub',
     'RULE-SET,youtube_domain,📹 YouTube',
