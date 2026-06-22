@@ -158,11 +158,11 @@ function unique(values) {
 
 function createRegionGroups(nodeNames, chainRegex) {
   const regions = [
-    { name: '🇭🇰 香港节点', test: /(🇭🇰|港|\bHK\b|Hong\s*Kong|HongKong)/i, exclude: /(落地|自建|台|日|韩|新|深|美)/i },
-    { name: '🇹🇼 台湾节点', test: /(🇹🇼|台|\bTW\b|Taiwan|台灣|臺灣)/i, exclude: /(落地|自建|港|日|韩|新|深|美)/i },
-    { name: '🇯🇵 日本节点', test: /(🇯🇵|日|\bJP\b|Japan|东京|大阪)/i, exclude: /(落地|自建|港|台|韩|新|美)/i },
-    { name: '🇸🇬 狮城节点', test: /(🇸🇬|新加坡|坡|狮城|\bSG\b|Singapore)/i, exclude: /(落地|自建|台|日|韩|深|美)/i },
-    { name: '🇺🇸 美国节点', test: /(🇺🇸|美|\bUS\b|States|America|United\s*States|洛杉矶|硅谷|西雅图)/i, exclude: /(落地|自建|港|台|韩|新|日)/i },
+    { name: '🇭🇰 香港', test: /(🇭🇰|港|\bHK\b|Hong\s*Kong|HongKong)/i, exclude: /(落地|自建|台|日|韩|新|深|美)/i },
+    { name: '🇹🇼 台湾', test: /(🇹🇼|台|\bTW\b|Taiwan|台灣|臺灣)/i, exclude: /(落地|自建|港|日|韩|新|深|美)/i },
+    { name: '🇸🇬 新加坡', test: /(🇸🇬|新加坡|坡|狮城|\bSG\b|Singapore)/i, exclude: /(落地|自建|台|日|韩|深|美)/i },
+    { name: '🇯🇵 日本', test: /(🇯🇵|日|\bJP\b|Japan|东京|大阪)/i, exclude: /(落地|自建|港|台|韩|新|美)/i },
+    { name: '🇺🇸 美国', test: /(🇺🇸|美|\bUS\b|States|America|United\s*States|洛杉矶|硅谷|西雅图)/i, exclude: /(落地|自建|港|台|韩|新|日)/i },
   ];
 
   return regions.map((region) => {
