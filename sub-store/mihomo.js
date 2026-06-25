@@ -134,7 +134,7 @@ function createChainGroups(nodeNames, chainRegex) {
   return {
     enabled: true,
     groups: [
-      { name: FRONT_PROXY_GROUP, type: 'select', proxies: unique([...frontNodes, '🌐 全部节点', '直连']) },
+      { name: FRONT_PROXY_GROUP, type: 'select', proxies: frontNodes.length > 0 ? frontNodes : ['直连'] },
       { name: LANDING_GROUP, type: 'select', proxies: landingNodes.length > 0 ? landingNodes : ['🌐 全部节点', '直连'] },
     ],
   };
