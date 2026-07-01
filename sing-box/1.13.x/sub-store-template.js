@@ -10,10 +10,13 @@
 const DEFAULT_NODE_FILTER_SOURCE = "^(?!.*(套餐|重置|剩余|到期|订阅|群|账户|流量|有效期|时间|官网|失联|余额)).*$";
 const DEFAULT_OUTBOUND = `🕳ℹ️🚀 节点选择🏷${DEFAULT_NODE_FILTER_SOURCE}🕳ℹ️🌐 全部节点🏷${DEFAULT_NODE_FILTER_SOURCE}🕳ℹ️🇭🇰 香港🏷ℹ️香港|港|hk|hong ?kong|🇭🇰🕳ℹ️🇹🇼 台湾🏷ℹ️台湾|台|tw|taiwan|🇹🇼🕳ℹ️🇯🇵 日本🏷ℹ️日本|日|jp|japan|🇯🇵🕳ℹ️🇸🇬 新加坡🏷ℹ️新加坡|新|sg|singapore|🇸🇬🕳ℹ️🇺🇸 美国🏷ℹ️美国|美|us|usa|united ?states|america|🇺🇸`;
 const DEFAULT_NODE_FILTER = new RegExp(DEFAULT_NODE_FILTER_SOURCE);
-const DEFAULT_INCLUDE_ALL_SELECTORS = /^(🤖 AI|📹 YouTube|🍀 Google|👨‍💻 Github|📲 Telegram|🎵 TikTok|🎥 Netflix|💶 PayPal|🎮 Steam|🪟 Microsoft|🐬 OneDrive|🍏 Apple|🐠 漏网之鱼)$/;
+const DEFAULT_INCLUDE_ALL_SELECTORS = /^(🤖 AI|📹 YouTube|🍀 Google|👨‍💻 Github|📲 Telegram|🎵 TikTok|🎥 Netflix|💶 PayPal|💱 交易所|🎮 Steam|🪟 Microsoft|🐬 OneDrive|🍏 Apple|🐠 漏网之鱼)$/;
 const POLICY_GROUP_CHOICES = ["🚀 节点选择", "🌐 全部节点", "🇭🇰 香港", "🇹🇼 台湾", "🇯🇵 日本", "🇸🇬 新加坡", "🇺🇸 美国", "🎯 全球直连"];
 const FRONT_PROXY_GROUP = "🔗 前置代理";
 const LANDING_GROUP = "🛬 落地节点";
+const EXCHANGE_GROUP = "💱 交易所";
+const EXCHANGE_RULE_SET = "geosite-cryptocurrency";
+const EXCHANGE_RULE_SET_URL = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-cryptocurrency.srs";
 const DEFAULT_LANDING_FILTER_SOURCE = "家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|Minor";
 const REGION_RULES = [
   { name: "🇭🇰 香港", flags: ["🇭🇰"], keywords: [/香港/i, /港/i, /\bHK\b/i, /Hong\s*Kong/i, /HongKong/i] },
@@ -58,6 +61,7 @@ async function renderSingBoxTemplate() {
 
   const outboundRules = parseOutboundRules(outbound);
   config.outbounds = Array.isArray(config.outbounds) ? config.outbounds : [];
+  ensureExchangePolicy(config);
 
   for (const outboundItem of config.outbounds) {
     if (!outboundItem || typeof outboundItem !== "object") continue;
@@ -170,6 +174,58 @@ function appendAllNodesToPolicyGroups(config, tags) {
     outboundItem.outbounds = unique(outboundItem.outbounds);
     log(`${outboundItem.tag} <= ${tags.length} direct selectable node(s)`);
   }
+}
+
+function ensureExchangePolicy(config) {
+  const outbounds = Array.isArray(config.outbounds) ? config.outbounds : [];
+  config.outbounds = outbounds;
+
+  let exchange = outbounds.find((outbound) => outbound && outbound.tag === EXCHANGE_GROUP);
+  if (!exchange) {
+    exchange = { tag: EXCHANGE_GROUP, type: "selector", outbounds: getPolicyGroupChoices(false) };
+    insertOutboundsAfter(outbounds, "💶 PayPal", [exchange]);
+  } else {
+    exchange.type = "selector";
+    exchange.outbounds = Array.isArray(exchange.outbounds) ? exchange.outbounds : getPolicyGroupChoices(false);
+  }
+
+  insertIntoSelectorAfter(config, "GLOBAL", "💶 PayPal", [EXCHANGE_GROUP]);
+  ensureExchangeRouteRule(config);
+  ensureExchangeRuleSet(config);
+}
+
+function ensureExchangeRouteRule(config) {
+  config.route = config.route && typeof config.route === "object" ? config.route : {};
+  config.route.rules = Array.isArray(config.route.rules) ? config.route.rules : [];
+  if (config.route.rules.some((rule) => rule && rule.rule_set === EXCHANGE_RULE_SET)) return;
+
+  const rule = { rule_set: EXCHANGE_RULE_SET, outbound: EXCHANGE_GROUP };
+  const index = config.route.rules.findIndex((item) => item && item.rule_set === "geosite-paypal");
+  if (index === -1) {
+    config.route.rules.push(rule);
+    return;
+  }
+  config.route.rules.splice(index + 1, 0, rule);
+}
+
+function ensureExchangeRuleSet(config) {
+  config.route = config.route && typeof config.route === "object" ? config.route : {};
+  config.route.rule_set = Array.isArray(config.route.rule_set) ? config.route.rule_set : [];
+  if (config.route.rule_set.some((ruleSet) => ruleSet && ruleSet.tag === EXCHANGE_RULE_SET)) return;
+
+  const ruleSet = {
+    tag: EXCHANGE_RULE_SET,
+    type: "remote",
+    format: "binary",
+    url: EXCHANGE_RULE_SET_URL,
+    download_detour: "🎯 全球直连"
+  };
+  const index = config.route.rule_set.findIndex((item) => item && item.tag === "geosite-paypal");
+  if (index === -1) {
+    config.route.rule_set.push(ruleSet);
+    return;
+  }
+  config.route.rule_set.splice(index + 1, 0, ruleSet);
 }
 
 function normalizePolicyGroupOrder(config, policyNodes, landing) {

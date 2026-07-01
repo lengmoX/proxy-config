@@ -172,6 +172,20 @@
       ]
     },
     {
+      "tag": "💱 交易所",
+      "type": "selector",
+      "outbounds": [
+        "🚀 节点选择",
+        "🌐 全部节点",
+        "🇭🇰 香港",
+        "🇹🇼 台湾",
+        "🇯🇵 日本",
+        "🇸🇬 新加坡",
+        "🇺🇸 美国",
+        "🎯 全球直连"
+      ]
+    },
+    {
       "tag": "🎮 Steam",
       "type": "selector",
       "outbounds": [
@@ -287,6 +301,7 @@
         "🎵 TikTok",
         "🎥 Netflix",
         "💶 PayPal",
+        "💱 交易所",
         "🎮 Steam",
         "🪟 Microsoft",
         "🐬 OneDrive",
@@ -385,6 +400,10 @@
       {
         "rule_set": "geosite-paypal",
         "outbound": "💶 PayPal"
+      },
+      {
+        "rule_set": "geosite-cryptocurrency",
+        "outbound": "💱 交易所"
       },
       {
         "rule_set": "geosite-steamcn",
@@ -502,6 +521,13 @@
         "type": "remote",
         "format": "binary",
         "url": "https://gh-proxy.com/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/paypal.srs",
+        "download_detour": "🎯 全球直连"
+      },
+      {
+        "tag": "geosite-cryptocurrency",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-cryptocurrency.srs",
         "download_detour": "🎯 全球直连"
       },
       {

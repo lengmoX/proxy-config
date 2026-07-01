@@ -14,6 +14,7 @@
 const FRONT_PROXY_GROUP = '🔗 前置代理';
 const LANDING_GROUP = '🛬 落地节点';
 const BACKGROUND_TEST_GROUP = '📊 延迟测试';
+const EXCHANGE_GROUP = '💱 交易所';
 const DEFAULT_LANDING_FILTER = '家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|链式|Minor';
 const REGION_RULES = [
   { name: '🇭🇰 香港', flags: ['🇭🇰'], keywords: [/香港/i, /港/i, /\bHK\b/i, /Hong\s*Kong/i, /HongKong/i] },
@@ -241,6 +242,7 @@ function createProxyGroups(nodeNames, regionGroups, policyChoices, chainGroups) 
     policy('🎥 NETFLIX'),
     policy('✈️ Speedtest'),
     policy('💶 PayPal'),
+    policy(EXCHANGE_GROUP),
     { name: '🍎 Apple', type: 'select', proxies: ['直连', '🚀 默认代理'] },
     { name: '🎯 直连', type: 'select', proxies: ['直连', '🚀 默认代理'] },
     policy('🐟 漏网之鱼'),
@@ -341,6 +343,7 @@ function createRules() {
     'RULE-SET,telegram_domain,📲 Telegram',
     'RULE-SET,netflix_domain,🎥 NETFLIX',
     'RULE-SET,paypal_domain,💶 PayPal',
+    `RULE-SET,cryptocurrency_domain,${EXCHANGE_GROUP}`,
     'RULE-SET,gfw_domain,🚀 默认代理',
     'RULE-SET,geolocation-!cn,🚀 默认代理',
     'RULE-SET,cn_domain,🎯 直连',
@@ -367,6 +370,7 @@ function createRuleProviders() {
     telegram_domain: domain('https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/telegram.mrs'),
     netflix_domain: domain('https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/netflix.mrs'),
     paypal_domain: domain('https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/paypal.mrs'),
+    cryptocurrency_domain: domain('https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-cryptocurrency.mrs'),
     onedrive_domain: domain('https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/onedrive.mrs'),
     microsoft_domain: domain('https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/microsoft.mrs'),
     apple_domain: domain('https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/apple-cn.mrs'),
