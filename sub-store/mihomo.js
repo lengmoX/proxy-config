@@ -15,6 +15,13 @@ const FRONT_PROXY_GROUP = '🔗 前置代理';
 const LANDING_GROUP = '🛬 落地节点';
 const BACKGROUND_TEST_GROUP = '📊 延迟测试';
 const DEFAULT_LANDING_FILTER = '家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|链式|Minor';
+const REGION_RULES = [
+  { name: '🇭🇰 香港', flags: ['🇭🇰'], keywords: [/香港/i, /港/i, /\bHK\b/i, /Hong\s*Kong/i, /HongKong/i] },
+  { name: '🇹🇼 台湾', flags: ['🇹🇼'], keywords: [/台湾/i, /台灣/i, /臺灣/i, /台/i, /\bTW\b/i, /Taiwan/i] },
+  { name: '🇸🇬 新加坡', flags: ['🇸🇬'], keywords: [/新加坡/i, /狮城/i, /坡/i, /\bSG\b/i, /Singapore/i] },
+  { name: '🇯🇵 日本', flags: ['🇯🇵'], keywords: [/日本/i, /东京/i, /大阪/i, /日/i, /\bJP\b/i, /Japan/i] },
+  { name: '🇺🇸 美国', flags: ['🇺🇸'], keywords: [/美国/i, /洛杉矶/i, /硅谷/i, /西雅图/i, /美/i, /\bUS\b/i, /\bUSA\b/i, /States/i, /America/i, /United\s*States/i] },
+];
 
 function main(config) {
   const args = getArguments();
@@ -158,18 +165,10 @@ function unique(values) {
 }
 
 function createRegionGroups(nodeNames, chainRegex) {
-  const regions = [
-    { name: '🇭🇰 香港', test: /(🇭🇰|港|\bHK\b|Hong\s*Kong|HongKong)/i, exclude: /(落地|自建|台|日|韩|新|深|美)/i },
-    { name: '🇹🇼 台湾', test: /(🇹🇼|台|\bTW\b|Taiwan|台灣|臺灣)/i, exclude: /(落地|自建|港|日|韩|新|深|美)/i },
-    { name: '🇸🇬 新加坡', test: /(🇸🇬|新加坡|坡|狮城|\bSG\b|Singapore)/i, exclude: /(落地|自建|台|日|韩|深|美)/i },
-    { name: '🇯🇵 日本', test: /(🇯🇵|日|\bJP\b|Japan|东京|大阪)/i, exclude: /(落地|自建|港|台|韩|新|美)/i },
-    { name: '🇺🇸 美国', test: /(🇺🇸|美|\bUS\b|States|America|United\s*States|洛杉矶|硅谷|西雅图)/i, exclude: /(落地|自建|港|台|韩|新|日)/i },
-  ];
-
-  return regions.map((region) => {
+  return REGION_RULES.map((region) => {
     const matched = nodeNames.filter((name) => {
       if (chainRegex && chainRegex.test(name)) return false;
-      return region.test.test(name) && !region.exclude.test(name);
+      return getRegionName(name) === region.name;
     });
     return {
       name: region.name,
@@ -177,6 +176,38 @@ function createRegionGroups(nodeNames, chainRegex) {
       proxies: matched.length > 0 ? matched : ['🌐 全部节点', '直连'],
     };
   });
+}
+
+function getRegionName(name) {
+  const value = String(name || '');
+  const flagMatch = getFirstRegionFlagMatch(value);
+  if (flagMatch) return flagMatch.name;
+
+  let firstMatch;
+  for (const region of REGION_RULES) {
+    for (const keyword of region.keywords) {
+      const match = keyword.exec(value);
+      if (!match) continue;
+      if (!firstMatch || match.index < firstMatch.index) {
+        firstMatch = { name: region.name, index: match.index };
+      }
+    }
+  }
+  return firstMatch && firstMatch.name;
+}
+
+function getFirstRegionFlagMatch(value) {
+  let firstMatch;
+  for (const region of REGION_RULES) {
+    for (const flag of region.flags) {
+      const index = value.indexOf(flag);
+      if (index === -1) continue;
+      if (!firstMatch || index < firstMatch.index) {
+        firstMatch = { name: region.name, index };
+      }
+    }
+  }
+  return firstMatch;
 }
 
 function createProxyGroups(nodeNames, regionGroups, policyChoices, chainGroups) {

@@ -15,6 +15,13 @@ const POLICY_GROUP_CHOICES = ["🚀 节点选择", "🌐 全部节点", "🇭�
 const FRONT_PROXY_GROUP = "🔗 前置代理";
 const LANDING_GROUP = "🛬 落地节点";
 const DEFAULT_LANDING_FILTER_SOURCE = "家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|Minor";
+const REGION_RULES = [
+  { name: "🇭🇰 香港", flags: ["🇭🇰"], keywords: [/香港/i, /港/i, /\bHK\b/i, /Hong\s*Kong/i, /HongKong/i] },
+  { name: "🇹🇼 台湾", flags: ["🇹🇼"], keywords: [/台湾/i, /台灣/i, /臺灣/i, /台/i, /\bTW\b/i, /Taiwan/i] },
+  { name: "🇯🇵 日本", flags: ["🇯🇵"], keywords: [/日本/i, /东京/i, /大阪/i, /日/i, /\bJP\b/i, /Japan/i] },
+  { name: "🇸🇬 新加坡", flags: ["🇸🇬"], keywords: [/新加坡/i, /狮城/i, /坡/i, /\bSG\b/i, /Singapore/i] },
+  { name: "🇺🇸 美国", flags: ["🇺🇸"], keywords: [/美国/i, /洛杉矶/i, /硅谷/i, /西雅图/i, /美/i, /\bUS\b/i, /\bUSA\b/i, /States/i, /America/i, /United\s*States/i] },
+];
 
 async function renderSingBoxTemplate() {
   log("start");
@@ -59,7 +66,7 @@ async function renderSingBoxTemplate() {
       if (!outboundRegex.test(outboundItem.tag || "")) continue;
       outboundItem.outbounds = Array.isArray(outboundItem.outbounds) ? outboundItem.outbounds : [];
 
-      const tags = getTags(proxies, tagRegex, shouldExcludeLanding(outboundItem.tag, landingRegex) ? landingRegex : null);
+      const tags = getTags(proxies, tagRegex, shouldExcludeLanding(outboundItem.tag, landingRegex) ? landingRegex : null, outboundItem.tag);
       log(`${outboundItem.tag} <= ${tags.length} node(s)`);
       outboundItem.outbounds.push(...tags);
       outboundItem.outbounds = unique(outboundItem.outbounds);
@@ -284,11 +291,54 @@ function shouldExcludeLanding(outboundTag, landingRegex) {
   return /^(🇭🇰 香港|🇹🇼 台湾|🇯🇵 日本|🇸🇬 新加坡|🇺🇸 美国)$/.test(outboundTag || "");
 }
 
-function getTags(proxies, regex, excludeRegex) {
+function getTags(proxies, regex, excludeRegex, outboundTag) {
+  const regionTag = getKnownRegionTag(outboundTag);
   return proxies
-    .filter((proxy) => proxy && regex.test(proxy.tag || ""))
+    .filter((proxy) => {
+      const tag = proxy && proxy.tag;
+      if (!tag) return false;
+      if (regionTag) return getRegionName(tag) === regionTag;
+      return regex.test(tag);
+    })
     .map((proxy) => proxy.tag)
     .filter((tag) => tag && !(excludeRegex && excludeRegex.test(tag)));
+}
+
+function getKnownRegionTag(tag) {
+  const value = String(tag || "");
+  return REGION_RULES.some((region) => region.name === value) ? value : undefined;
+}
+
+function getRegionName(name) {
+  const value = String(name || "");
+  const flagMatch = getFirstRegionFlagMatch(value);
+  if (flagMatch) return flagMatch.name;
+
+  let firstMatch;
+  for (const region of REGION_RULES) {
+    for (const keyword of region.keywords) {
+      const match = keyword.exec(value);
+      if (!match) continue;
+      if (!firstMatch || match.index < firstMatch.index) {
+        firstMatch = { name: region.name, index: match.index };
+      }
+    }
+  }
+  return firstMatch && firstMatch.name;
+}
+
+function getFirstRegionFlagMatch(value) {
+  let firstMatch;
+  for (const region of REGION_RULES) {
+    for (const flag of region.flags) {
+      const index = value.indexOf(flag);
+      if (index === -1) continue;
+      if (!firstMatch || index < firstMatch.index) {
+        firstMatch = { name: region.name, index };
+      }
+    }
+  }
+  return firstMatch;
 }
 
 function createMarkedRegExp(pattern) {
