@@ -74,6 +74,20 @@
       ]
     },
     {
+      "tag": "📲 Telegram",
+      "type": "selector",
+      "outbounds": [
+        "🚀 节点选择",
+        "🌐 全部节点",
+        "🇭🇰 香港",
+        "🇹🇼 台湾",
+        "🇯🇵 日本",
+        "🇸🇬 新加坡",
+        "🇺🇸 美国",
+        "🎯 全球直连"
+      ]
+    },
+    {
       "tag": "📹 YouTube",
       "type": "selector",
       "outbounds": [
@@ -103,20 +117,6 @@
     },
     {
       "tag": "👨‍💻 Github",
-      "type": "selector",
-      "outbounds": [
-        "🚀 节点选择",
-        "🌐 全部节点",
-        "🇭🇰 香港",
-        "🇹🇼 台湾",
-        "🇯🇵 日本",
-        "🇸🇬 新加坡",
-        "🇺🇸 美国",
-        "🎯 全球直连"
-      ]
-    },
-    {
-      "tag": "📲 Telegram",
       "type": "selector",
       "outbounds": [
         "🚀 节点选择",
@@ -294,10 +294,10 @@
         "🚀 节点选择",
         "🌐 全部节点",
         "🤖 AI",
+        "📲 Telegram",
         "📹 YouTube",
         "🍀 Google",
         "👨‍💻 Github",
-        "📲 Telegram",
         "🎵 TikTok",
         "🎥 Netflix",
         "💶 PayPal",

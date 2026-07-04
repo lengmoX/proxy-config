@@ -10,7 +10,7 @@
 const DEFAULT_NODE_FILTER_SOURCE = "^(?!.*(套餐|重置|剩余|到期|订阅|群|账户|流量|有效期|时间|官网|失联|余额)).*$";
 const DEFAULT_OUTBOUND = `🕳ℹ️🚀 节点选择🏷${DEFAULT_NODE_FILTER_SOURCE}🕳ℹ️🌐 全部节点🏷${DEFAULT_NODE_FILTER_SOURCE}🕳ℹ️🇭🇰 香港🏷ℹ️香港|港|hk|hong ?kong|🇭🇰🕳ℹ️🇹🇼 台湾🏷ℹ️台湾|台|tw|taiwan|🇹🇼🕳ℹ️🇯🇵 日本🏷ℹ️日本|日|jp|japan|🇯🇵🕳ℹ️🇸🇬 新加坡🏷ℹ️新加坡|新|sg|singapore|🇸🇬🕳ℹ️🇺🇸 美国🏷ℹ️美国|美|us|usa|united ?states|america|🇺🇸`;
 const DEFAULT_NODE_FILTER = new RegExp(DEFAULT_NODE_FILTER_SOURCE);
-const DEFAULT_INCLUDE_ALL_SELECTORS = /^(🤖 AI|📹 YouTube|🍀 Google|👨‍💻 Github|📲 Telegram|🎵 TikTok|🎥 Netflix|💶 PayPal|💱 交易所|🎮 Steam|🪟 Microsoft|🐬 OneDrive|🍏 Apple|🐠 漏网之鱼)$/;
+const DEFAULT_INCLUDE_ALL_SELECTORS = /^(🤖 AI|📲 Telegram|📹 YouTube|🍀 Google|👨‍💻 Github|🎵 TikTok|🎥 Netflix|💶 PayPal|💱 交易所|🎮 Steam|🪟 Microsoft|🐬 OneDrive|🍏 Apple|🐠 漏网之鱼)$/;
 const POLICY_GROUP_CHOICES = ["🚀 节点选择", "🌐 全部节点", "🇭🇰 香港", "🇹🇼 台湾", "🇯🇵 日本", "🇸🇬 新加坡", "🇺🇸 美国", "🎯 全球直连"];
 const FRONT_PROXY_GROUP = "🔗 前置代理";
 const LANDING_GROUP = "🛬 落地节点";
@@ -293,9 +293,9 @@ function ensureLandingGroups(config, proxies, landingRegex) {
   ];
 
   removeOutbounds(config.outbounds, [FRONT_PROXY_GROUP, LANDING_GROUP]);
-  insertOutboundsAfter(config.outbounds, "🤖 AI", groups);
+  insertOutboundsAfter(config.outbounds, "📲 Telegram", groups);
 
-  insertIntoSelectorAfter(config, "GLOBAL", "🤖 AI", [FRONT_PROXY_GROUP, LANDING_GROUP]);
+  insertIntoSelectorAfter(config, "GLOBAL", "📲 Telegram", [FRONT_PROXY_GROUP, LANDING_GROUP]);
   log(`landing enabled: ${landingTags.length} landing node(s), ${frontTags.length} front node(s)`);
 }
 
