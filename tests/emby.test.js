@@ -107,11 +107,11 @@ describe("Emby policy", () => {
     const sing = await renderSingBox({});
     const mihomo = renderMihomo({});
     expect(sing.route.rule_set.find((rule) => rule.tag === "emby").url).toBe(
-      "https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json",
+      "https://gh-proxy.com/https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json",
     );
     expect(sing.route.rules.some((rule) => rule.rule_set === "emby" && rule.outbound === EMBY)).toBe(true);
     expect(mihomo["rule-providers"].emby.url).toBe(
-      "https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml",
+      "https://gh-proxy.com/https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml",
     );
     expect(mihomo.rules).toContain(`RULE-SET,emby,${EMBY}`);
   });

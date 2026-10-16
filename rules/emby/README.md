@@ -45,8 +45,8 @@ mihomo：在 `payload` 中追加：
 当前默认直链均返回文件正文：
 
 ```text
-https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json
-https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml
+https://gh-proxy.com/https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json
+https://gh-proxy.com/https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml
 ```
 
 如需改用自己的文件托管地址，在 Sub-Store 脚本参数中新增 `embyRuleUrl`，sing-box 填 JSON 文件地址，
@@ -62,13 +62,14 @@ sing-box 生成的规则集形如：
   "tag": "emby",
   "type": "remote",
   "format": "source",
-  "url": "https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json",
+  "url": "https://gh-proxy.com/https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json",
   "download_detour": "🎯 全球直连"
 }
 ```
 
-sing-box 默认通过直连下载此规则集，因此地址必须在你的网络中可访问。
-若无法直连 GitHub Raw，可用 `embyRuleUrl` 覆盖为可访问的镜像直链。
+两个脚本默认通过 `https://gh-proxy.com/` 加速 GitHub Raw 规则下载。
+sing-box 的下载出站仍为 `🎯 全球直连`，因此加速服务必须在你的网络中可访问。
+如需更换镜像或恢复 GitHub Raw 原始地址，可通过 `embyRuleUrl` 覆盖。
 
 不需要编译二进制。若以后改用二进制规则，sing-box 需真正编译成 `.srs`
 并改为 `format: binary`；mihomo 的 `.mrs` 是另一种格式，不能共用，

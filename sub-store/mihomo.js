@@ -17,7 +17,7 @@ const LANDING_GROUP = '🛬 落地节点';
 const BACKGROUND_TEST_GROUP = '📊 延迟测试';
 const EXCHANGE_GROUP = '💱 交易所';
 const EMBY_GROUP = '🎬 Emby';
-const DEFAULT_EMBY_RULE_URL = 'https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml';
+const DEFAULT_EMBY_RULE_URL = 'https://gh-proxy.com/https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml';
 const DEFAULT_LANDING_FILTER = '家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|链式|Minor';
 const REGION_RULES = [
   { name: '🇭🇰 香港', flags: ['🇭🇰'], keywords: [/香港/i, /港/i, /\bHK\b/i, /Hong\s*Kong/i, /HongKong/i] },
