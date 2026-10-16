@@ -5,7 +5,7 @@
  * - policyNodes=none|all，默认 none。all 会让业务策略组直接展示全部单节点。
  * - landing=true|false，默认 false。启用后识别落地节点并生成前置/落地分组。
  * - chainFilter=<正则>，landing=true 时可覆盖默认落地节点识别正则。
- * - embyRuleUrl=<直链>，可选，mihomo classical YAML 规则文件；省略时只创建 Emby 分组。
+ * - embyRuleUrl=<直链>，可选，默认使用本仓库的 classical YAML 规则；空字符串时只创建 Emby 分组。
  *
  * 示例：
  * https://example.com/mihomo.js#policyNodes=all&landing=true
@@ -17,6 +17,7 @@ const LANDING_GROUP = '🛬 落地节点';
 const BACKGROUND_TEST_GROUP = '📊 延迟测试';
 const EXCHANGE_GROUP = '💱 交易所';
 const EMBY_GROUP = '🎬 Emby';
+const DEFAULT_EMBY_RULE_URL = 'https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml';
 const DEFAULT_LANDING_FILTER = '家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|链式|Minor';
 const REGION_RULES = [
   { name: '🇭🇰 香港', flags: ['🇭🇰'], keywords: [/香港/i, /港/i, /\bHK\b/i, /Hong\s*Kong/i, /HongKong/i] },
@@ -32,7 +33,7 @@ function main(config) {
     policyNodes: normalizePolicyNodes(args.policyNodes),
     landing: parseBool(args.landing, false),
     chainFilter: args.chainFilter,
-    embyRuleUrl: args.embyRuleUrl,
+    embyRuleUrl: typeof args.embyRuleUrl === 'undefined' ? DEFAULT_EMBY_RULE_URL : args.embyRuleUrl,
   });
 }
 

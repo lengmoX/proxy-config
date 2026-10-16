@@ -5,7 +5,7 @@
 // policyNodes=all|none, optional. Default none: all appends all nodes to policy selectors; none keeps policy selectors group-only.
 // landing=true|false, optional. Default false: enable landing/front-proxy groups and add detour to landing nodes.
 // chainFilter is optional. If landing=true, it overrides the default landing node regex.
-// embyRuleUrl is optional: direct URL of a sing-box source JSON rule-set. Omitted: group only.
+// embyRuleUrl is optional: defaults to this repository's source JSON rule-set; empty string: group only.
 // outbound is optional. If omitted, nodes are automatically grouped into common region selectors.
 
 const DEFAULT_NODE_FILTER_SOURCE = "^(?!.*(套餐|重置|剩余|到期|订阅|群|账户|流量|有效期|时间|官网|失联|余额)).*$";
@@ -17,6 +17,7 @@ const FRONT_PROXY_GROUP = "🔗 前置代理";
 const LANDING_GROUP = "🛬 落地节点";
 const EMBY_GROUP = "🎬 Emby";
 const EMBY_RULE_SET = "emby";
+const DEFAULT_EMBY_RULE_URL = "https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json";
 const EXCHANGE_GROUP = "💱 交易所";
 const EXCHANGE_RULE_SET = "geosite-cryptocurrency";
 const EXCHANGE_RULE_SET_URL = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-cryptocurrency.srs";
@@ -32,7 +33,7 @@ const REGION_RULES = [
 async function renderSingBoxTemplate() {
   log("start");
 
-  let { type, name, outbound, includeUnsupportedProxy, url, policyNodes, landing, chainFilter, embyRuleUrl } = typeof $arguments !== "undefined" ? $arguments : {};
+  let { type, name, outbound, includeUnsupportedProxy, url, policyNodes, landing, chainFilter, embyRuleUrl = DEFAULT_EMBY_RULE_URL } = typeof $arguments !== "undefined" ? $arguments : {};
   if (!name) throw new Error("missing argument: name");
   policyNodes = normalizePolicyNodes(policyNodes);
   landing = parseBool(landing, false);
@@ -189,7 +190,7 @@ function ensureEmbyPolicy(config, ruleUrl) {
   insertIntoSelectorAfter(config, "GLOBAL", "📲 Telegram", [EMBY_GROUP]);
 
   if (!ruleUrl) {
-    log("embyRuleUrl omitted, Emby group only (existing template rules are preserved)");
+    log("embyRuleUrl disabled, Emby group only (existing template rules are preserved)");
     return;
   }
 

@@ -51,11 +51,11 @@ describe("Emby policy", () => {
           const args = { policyNodes, landing };
           const sing = await renderSingBox({
             ...args,
-            ...(enabled ? { embyRuleUrl: "https://example.com/emby.json" } : {}),
+            embyRuleUrl: enabled ? "https://example.com/emby.json" : "",
           });
           const mihomo = renderMihomo({
             ...args,
-            ...(enabled ? { embyRuleUrl: "https://example.com/emby.yaml" } : {}),
+            embyRuleUrl: enabled ? "https://example.com/emby.yaml" : "",
           });
           expectAfterTelegram(sing.outbounds.map((group) => group.tag));
           expectAfterTelegram(sing.outbounds.find((group) => group.tag === "GLOBAL").outbounds);
@@ -96,11 +96,24 @@ describe("Emby policy", () => {
     expect(config.route.rule_set.filter((rule) => rule.tag === "emby")).toHaveLength(1);
   });
 
-  test("sing-box preserves existing Emby rules without a URL argument", async () => {
+  test("sing-box preserves existing Emby rules when URL is disabled", async () => {
     const original = await renderSingBox({ embyRuleUrl: "https://example.com/emby.json" });
-    const config = await renderSingBox({}, original);
+    const config = await renderSingBox({ embyRuleUrl: "" }, original);
     expect(config.route.rules.filter((rule) => rule.rule_set === "emby")).toHaveLength(1);
     expect(config.route.rule_set.find((rule) => rule.tag === "emby").url).toBe("https://example.com/emby.json");
+  });
+
+  test("both scripts enable repository rule URLs by default", async () => {
+    const sing = await renderSingBox({});
+    const mihomo = renderMihomo({});
+    expect(sing.route.rule_set.find((rule) => rule.tag === "emby").url).toBe(
+      "https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json",
+    );
+    expect(sing.route.rules.some((rule) => rule.rule_set === "emby" && rule.outbound === EMBY)).toBe(true);
+    expect(mihomo["rule-providers"].emby.url).toBe(
+      "https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml",
+    );
+    expect(mihomo.rules).toContain(`RULE-SET,emby,${EMBY}`);
   });
 
   test("source rule files describe the same service domains", () => {

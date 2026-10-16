@@ -4,7 +4,8 @@
 `policyNodes=all|none` 和 `landing=true|false` 参数。
 默认跟随默认代理，可在面板中切换为直连、地区组或其他可选节点。
 
-**未传 `embyRuleUrl` 时仅创建分组，不下载 Emby 规则，也不新增 Emby 分流规则。**
+**两个脚本默认使用本仓库的 Emby 规则直链，无需额外传参即可启用分流。**
+可通过 `embyRuleUrl` 覆盖地址；传入空字符串时仅创建分组，不新增规则或下载配置。
 sing-box 模板原有的自定义规则会保留。无需修改原来的 AI 规则。
 
 ## 1. 填写规则文件
@@ -39,18 +40,18 @@ mihomo：在 `payload` 中追加：
 注意：现有更靠前的规则仍可能优先命中，例如 sing-box 的私网直连规则。
 本功能不是通过识别 Emby 应用或端口来自动发现所有服务器。
 
-## 2. 上传后接入直链
+## 2. 默认直链与自定义地址
 
-上传至可访问的文件托管服务，取得**返回文件正文**的 HTTPS URL，不要使用 GitHub 的
-`blob` 网页地址。GitHub Raw 地址格式为：
+当前默认直链均返回文件正文：
 
 ```text
-https://raw.githubusercontent.com/<用户名>/<仓库>/<分支>/rules/emby/sing-box.json
-https://raw.githubusercontent.com/<用户名>/<仓库>/<分支>/rules/emby/mihomo.yaml
+https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json
+https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml
 ```
 
-在 Sub-Store 脚本参数中新增 `embyRuleUrl`，sing-box 填 JSON 文件地址，
+如需改用自己的文件托管地址，在 Sub-Store 脚本参数中新增 `embyRuleUrl`，sing-box 填 JSON 文件地址，
 mihomo 填 YAML 文件地址。保留原有参数；sing-box 仍需 `name`。
+不要使用 GitHub 的 `blob` 网页地址。
 如果通过脚本 URL 的 `#key=value&...` 传参，应对规则 URL 使用
 `encodeURIComponent` 编码，尤其是包含 `&`、`#` 的地址。
 
@@ -61,13 +62,13 @@ sing-box 生成的规则集形如：
   "tag": "emby",
   "type": "remote",
   "format": "source",
-  "url": "https://example.com/rules/emby/sing-box.json",
+  "url": "https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json",
   "download_detour": "🎯 全球直连"
 }
 ```
 
-这里的 URL 是格式示例，脚本不会默认使用它。sing-box 通过直连下载此规则集，
-因此真实地址必须在你的网络中可访问。
+sing-box 默认通过直连下载此规则集，因此地址必须在你的网络中可访问。
+若无法直连 GitHub Raw，可用 `embyRuleUrl` 覆盖为可访问的镜像直链。
 
 不需要编译二进制。若以后改用二进制规则，sing-box 需真正编译成 `.srs`
 并改为 `format: binary`；mihomo 的 `.mrs` 是另一种格式，不能共用，
