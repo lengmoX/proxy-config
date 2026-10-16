@@ -5,6 +5,7 @@
  * - policyNodes=none|all，默认 none。all 会让业务策略组直接展示全部单节点。
  * - landing=true|false，默认 false。启用后识别落地节点并生成前置/落地分组。
  * - chainFilter=<正则>，landing=true 时可覆盖默认落地节点识别正则。
+ * - embyRuleUrl=<直链>，可选，mihomo classical YAML 规则文件；省略时只创建 Emby 分组。
  *
  * 示例：
  * https://example.com/mihomo.js#policyNodes=all&landing=true
@@ -15,6 +16,7 @@ const FRONT_PROXY_GROUP = '🔗 前置代理';
 const LANDING_GROUP = '🛬 落地节点';
 const BACKGROUND_TEST_GROUP = '📊 延迟测试';
 const EXCHANGE_GROUP = '💱 交易所';
+const EMBY_GROUP = '🎬 Emby';
 const DEFAULT_LANDING_FILTER = '家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|链式|Minor';
 const REGION_RULES = [
   { name: '🇭🇰 香港', flags: ['🇭🇰'], keywords: [/香港/i, /港/i, /\bHK\b/i, /Hong\s*Kong/i, /HongKong/i] },
@@ -30,6 +32,7 @@ function main(config) {
     policyNodes: normalizePolicyNodes(args.policyNodes),
     landing: parseBool(args.landing, false),
     chainFilter: args.chainFilter,
+    embyRuleUrl: args.embyRuleUrl,
   });
 }
 
@@ -108,8 +111,8 @@ function buildMihomoConfig(input, options) {
     tun: createTun(),
     dns: createDns(),
     'proxy-groups': createProxyGroups(selectableNodes, regionGroups, policyChoices, chainGroups),
-    rules: createRules(),
-    'rule-providers': createRuleProviders(),
+    rules: createRules(options.embyRuleUrl),
+    'rule-providers': createRuleProviders(options.embyRuleUrl),
   };
   delete result['proxy-providers'];
   return result;
@@ -230,6 +233,7 @@ function createProxyGroups(nodeNames, regionGroups, policyChoices, chainGroups) 
     allNodeGroup,
     policy('🤖 AI'),
     policy('📲 Telegram'),
+    policy(EMBY_GROUP),
     ...chainGroups.groups,
     { name: '🔄 订阅更新', type: 'select', proxies: ['直连', '🚀 默认代理'] },
     policy('📹 PikPak'),
@@ -320,7 +324,7 @@ function createDns() {
   };
 }
 
-function createRules() {
+function createRules(embyRuleUrl) {
   return [
     'DOMAIN-SUFFIX,qichiyu.com,🚀 默认代理',
     'DOMAIN-SUFFIX,cloudflare.com,🚀 默认代理',
@@ -328,6 +332,7 @@ function createRules() {
     'DOMAIN-SUFFIX,xn--9kqz23b19z.com,🚀 默认代理',
     'DOMAIN-SUFFIX,google.com,🚀 默认代理',
     'RULE-SET,private_domain,直连',
+    ...(embyRuleUrl ? [`RULE-SET,emby,${EMBY_GROUP}`] : []),
     'RULE-SET,apple_domain,🍎 Apple',
     'RULE-SET,proxylite,🚀 默认代理',
     'RULE-SET,cloudflare,🚀 默认代理',
@@ -355,12 +360,22 @@ function createRules() {
   ];
 }
 
-function createRuleProviders() {
+function createRuleProviders(embyRuleUrl) {
   const domain = (url) => ({ type: 'http', interval: 86400, behavior: 'domain', format: 'mrs', url });
   const ip = (url) => ({ type: 'http', interval: 86400, behavior: 'ipcidr', format: 'mrs', url });
   const classical = (url) => ({ type: 'http', interval: 86400, behavior: 'classical', format: 'text', url });
 
   return {
+    ...(embyRuleUrl ? {
+      emby: {
+        type: 'http',
+        interval: 86400,
+        behavior: 'classical',
+        format: 'yaml',
+        path: './ruleset/emby.yaml',
+        url: String(embyRuleUrl),
+      },
+    } : {}),
     private_domain: domain('https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.mrs'),
     proxylite: classical('https://raw.githubusercontent.com/qichiyuhub/rule/refs/heads/main/rules/proxy.list'),
     ai: domain('https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/category-ai-!cn.mrs'),

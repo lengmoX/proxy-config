@@ -1,0 +1,5 @@
+# Emby 服务域名，与 sing-box.json 保持同步。
+payload:
+  - DOMAIN-SUFFIX,random.ouonet.org
+  - DOMAIN-SUFFIX,pro.emby.moe
+  - DOMAIN-SUFFIX,emby.ibukifuko.tech

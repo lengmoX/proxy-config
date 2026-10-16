@@ -1,0 +1,12 @@
+{
+  "version": 3,
+  "rules": [
+    {
+      "domain_suffix": [
+        "random.ouonet.org",
+        "pro.emby.moe",
+        "emby.ibukifuko.tech"
+      ]
+    }
+  ]
+}

@@ -5,15 +5,18 @@
 // policyNodes=all|none, optional. Default none: all appends all nodes to policy selectors; none keeps policy selectors group-only.
 // landing=true|false, optional. Default false: enable landing/front-proxy groups and add detour to landing nodes.
 // chainFilter is optional. If landing=true, it overrides the default landing node regex.
+// embyRuleUrl is optional: direct URL of a sing-box source JSON rule-set. Omitted: group only.
 // outbound is optional. If omitted, nodes are automatically grouped into common region selectors.
 
 const DEFAULT_NODE_FILTER_SOURCE = "^(?!.*(套餐|重置|剩余|到期|订阅|群|账户|流量|有效期|时间|官网|失联|余额)).*$";
 const DEFAULT_OUTBOUND = `🕳ℹ️🚀 节点选择🏷${DEFAULT_NODE_FILTER_SOURCE}🕳ℹ️🌐 全部节点🏷${DEFAULT_NODE_FILTER_SOURCE}🕳ℹ️🇭🇰 香港🏷ℹ️香港|港|hk|hong ?kong|🇭🇰🕳ℹ️🇹🇼 台湾🏷ℹ️台湾|台|tw|taiwan|🇹🇼🕳ℹ️🇯🇵 日本🏷ℹ️日本|日|jp|japan|🇯🇵🕳ℹ️🇸🇬 新加坡🏷ℹ️新加坡|新|sg|singapore|🇸🇬🕳ℹ️🇺🇸 美国🏷ℹ️美国|美|us|usa|united ?states|america|🇺🇸`;
 const DEFAULT_NODE_FILTER = new RegExp(DEFAULT_NODE_FILTER_SOURCE);
-const DEFAULT_INCLUDE_ALL_SELECTORS = /^(🤖 AI|📲 Telegram|📹 YouTube|🍀 Google|👨‍💻 Github|🎵 TikTok|🎥 Netflix|💶 PayPal|💱 交易所|🎮 Steam|🪟 Microsoft|🐬 OneDrive|🍏 Apple|🐠 漏网之鱼)$/;
+const DEFAULT_INCLUDE_ALL_SELECTORS = /^(🤖 AI|📲 Telegram|🎬 Emby|📹 YouTube|🍀 Google|👨‍💻 Github|🎵 TikTok|🎥 Netflix|💶 PayPal|💱 交易所|🎮 Steam|🪟 Microsoft|🐬 OneDrive|🍏 Apple|🐠 漏网之鱼)$/;
 const POLICY_GROUP_CHOICES = ["🚀 节点选择", "🌐 全部节点", "🇭🇰 香港", "🇹🇼 台湾", "🇯🇵 日本", "🇸🇬 新加坡", "🇺🇸 美国", "🎯 全球直连"];
 const FRONT_PROXY_GROUP = "🔗 前置代理";
 const LANDING_GROUP = "🛬 落地节点";
+const EMBY_GROUP = "🎬 Emby";
+const EMBY_RULE_SET = "emby";
 const EXCHANGE_GROUP = "💱 交易所";
 const EXCHANGE_RULE_SET = "geosite-cryptocurrency";
 const EXCHANGE_RULE_SET_URL = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-cryptocurrency.srs";
@@ -29,7 +32,7 @@ const REGION_RULES = [
 async function renderSingBoxTemplate() {
   log("start");
 
-  let { type, name, outbound, includeUnsupportedProxy, url, policyNodes, landing, chainFilter } = typeof $arguments !== "undefined" ? $arguments : {};
+  let { type, name, outbound, includeUnsupportedProxy, url, policyNodes, landing, chainFilter, embyRuleUrl } = typeof $arguments !== "undefined" ? $arguments : {};
   if (!name) throw new Error("missing argument: name");
   policyNodes = normalizePolicyNodes(policyNodes);
   landing = parseBool(landing, false);
@@ -62,6 +65,7 @@ async function renderSingBoxTemplate() {
   const outboundRules = parseOutboundRules(outbound);
   config.outbounds = Array.isArray(config.outbounds) ? config.outbounds : [];
   ensureExchangePolicy(config);
+  ensureEmbyPolicy(config, embyRuleUrl);
 
   for (const outboundItem of config.outbounds) {
     if (!outboundItem || typeof outboundItem !== "object") continue;
@@ -173,6 +177,40 @@ function appendAllNodesToPolicyGroups(config, tags) {
     outboundItem.outbounds.push(...tags);
     outboundItem.outbounds = unique(outboundItem.outbounds);
     log(`${outboundItem.tag} <= ${tags.length} direct selectable node(s)`);
+  }
+}
+
+function ensureEmbyPolicy(config, ruleUrl) {
+  const emby = config.outbounds.find((outbound) => outbound && outbound.tag === EMBY_GROUP)
+    || { tag: EMBY_GROUP, type: "selector", outbounds: getPolicyGroupChoices(false) };
+  emby.type = "selector";
+  removeOutbounds(config.outbounds, [EMBY_GROUP]);
+  insertOutboundsAfter(config.outbounds, "📲 Telegram", [emby]);
+  insertIntoSelectorAfter(config, "GLOBAL", "📲 Telegram", [EMBY_GROUP]);
+
+  if (!ruleUrl) {
+    log("embyRuleUrl omitted, Emby group only (existing template rules are preserved)");
+    return;
+  }
+
+  config.route = config.route && typeof config.route === "object" ? config.route : {};
+  config.route.rule_set = Array.isArray(config.route.rule_set) ? config.route.rule_set : [];
+  const ruleSet = {
+    tag: EMBY_RULE_SET,
+    type: "remote",
+    format: "source",
+    url: String(ruleUrl),
+    download_detour: "🎯 全球直连"
+  };
+  const existing = config.route.rule_set.findIndex((item) => item && item.tag === EMBY_RULE_SET);
+  if (existing === -1) config.route.rule_set.push(ruleSet);
+  else config.route.rule_set[existing] = ruleSet;
+
+  config.route.rules = Array.isArray(config.route.rules) ? config.route.rules : [];
+  if (!config.route.rules.some((rule) => rule && rule.rule_set === EMBY_RULE_SET && rule.outbound === EMBY_GROUP)) {
+    const index = config.route.rules.findIndex((rule) => rule && rule.rule_set === "geosite-telegram");
+    const rule = { rule_set: EMBY_RULE_SET, outbound: EMBY_GROUP };
+    config.route.rules.splice(index === -1 ? 0 : index + 1, 0, rule);
   }
 }
 
@@ -293,9 +331,9 @@ function ensureLandingGroups(config, proxies, landingRegex) {
   ];
 
   removeOutbounds(config.outbounds, [FRONT_PROXY_GROUP, LANDING_GROUP]);
-  insertOutboundsAfter(config.outbounds, "📲 Telegram", groups);
+  insertOutboundsAfter(config.outbounds, EMBY_GROUP, groups);
 
-  insertIntoSelectorAfter(config, "GLOBAL", "📲 Telegram", [FRONT_PROXY_GROUP, LANDING_GROUP]);
+  insertIntoSelectorAfter(config, "GLOBAL", EMBY_GROUP, [FRONT_PROXY_GROUP, LANDING_GROUP]);
   log(`landing enabled: ${landingTags.length} landing node(s), ${frontTags.length} front node(s)`);
 }
 
