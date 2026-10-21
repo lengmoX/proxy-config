@@ -197,6 +197,8 @@ Optional arguments:
 - `outbound`
 - `policyNodes`
 
+The script always ensures a `📹 PikPak` selector and routes `mypikpak.com` to it, matching the mihomo `DOMAIN-SUFFIX,mypikpak.com,📹 PikPak` rule.
+
 ### Default Grouping
 
 `outbound` is optional. If omitted, the script automatically injects nodes into:

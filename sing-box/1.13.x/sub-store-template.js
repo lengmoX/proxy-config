@@ -6,6 +6,7 @@
 // landing=true|false, optional. Default false: enable landing/front-proxy groups and add detour to landing nodes.
 // chainFilter is optional. If landing=true, it overrides the default landing node regex.
 // embyRuleUrl is optional: defaults to this repository's source JSON rule-set; empty string: group only.
+// PikPak is always created and routes mypikpak.com, matching the mihomo template.
 // outbound is optional. If omitted, nodes are automatically grouped into common region selectors.
 
 const DEFAULT_NODE_FILTER_SOURCE =
@@ -13,7 +14,7 @@ const DEFAULT_NODE_FILTER_SOURCE =
 const DEFAULT_OUTBOUND = `🕳ℹ️🚀 节点选择🏷${DEFAULT_NODE_FILTER_SOURCE}🕳ℹ️🌐 全部节点🏷${DEFAULT_NODE_FILTER_SOURCE}🕳ℹ️🇭🇰 香港🏷ℹ️香港|港|hk|hong ?kong|🇭🇰🕳ℹ️🇹🇼 台湾🏷ℹ️台湾|台|tw|taiwan|🇹🇼🕳ℹ️🇯🇵 日本🏷ℹ️日本|日|jp|japan|🇯🇵🕳ℹ️🇸🇬 新加坡🏷ℹ️新加坡|新|sg|singapore|🇸🇬🕳ℹ️🇺🇸 美国🏷ℹ️美国|美|us|usa|united ?states|america|🇺🇸`
 const DEFAULT_NODE_FILTER = new RegExp(DEFAULT_NODE_FILTER_SOURCE)
 const DEFAULT_INCLUDE_ALL_SELECTORS =
-  /^(🤖 AI|📲 Telegram|🎬 Emby|📹 YouTube|🍀 Google|👨‍💻 Github|🎵 TikTok|🎥 Netflix|💶 PayPal|💱 交易所|🎮 Steam|🪟 Microsoft|🐬 OneDrive|🍏 Apple|🐠 漏网之鱼)$/
+  /^(🤖 AI|📲 Telegram|🎬 Emby|📹 PikPak|📹 YouTube|🍀 Google|👨‍💻 Github|🎵 TikTok|🎥 Netflix|💶 PayPal|💱 交易所|🎮 Steam|🪟 Microsoft|🐬 OneDrive|🍏 Apple|🐠 漏网之鱼)$/
 const POLICY_GROUP_CHOICES = [
   '🚀 节点选择',
   '🌐 全部节点',
@@ -30,6 +31,8 @@ const EMBY_GROUP = '🎬 Emby'
 const EMBY_RULE_SET = 'emby'
 const DEFAULT_EMBY_RULE_URL =
   'https://gh-proxy.com/https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/sing-box.json'
+const PIKPAK_GROUP = '📹 PikPak'
+const PIKPAK_DOMAIN_SUFFIX = 'mypikpak.com'
 const EXCHANGE_GROUP = '💱 交易所'
 const EXCHANGE_RULE_SET = 'geosite-cryptocurrency'
 const EXCHANGE_RULE_SET_URL =
@@ -133,6 +136,7 @@ async function renderSingBoxTemplate () {
   config.outbounds = Array.isArray(config.outbounds) ? config.outbounds : []
   ensureExchangePolicy(config)
   ensureEmbyPolicy(config, embyRuleUrl)
+  ensurePikPakPolicy(config)
 
   for (const outboundItem of config.outbounds) {
     if (!outboundItem || typeof outboundItem !== 'object') continue
@@ -323,6 +327,56 @@ function ensureEmbyPolicy (config, ruleUrl) {
     const rule = { rule_set: EMBY_RULE_SET, outbound: EMBY_GROUP }
     config.route.rules.splice(index === -1 ? 0 : index + 1, 0, rule)
   }
+}
+
+function ensurePikPakPolicy (config) {
+  const pikpak = config.outbounds.find(
+    outbound => outbound && outbound.tag === PIKPAK_GROUP
+  ) || {
+    tag: PIKPAK_GROUP,
+    type: 'selector',
+    outbounds: getPolicyGroupChoices(false)
+  }
+  pikpak.type = 'selector'
+  pikpak.outbounds = Array.isArray(pikpak.outbounds)
+    ? pikpak.outbounds
+    : getPolicyGroupChoices(false)
+  removeOutbounds(config.outbounds, [PIKPAK_GROUP])
+  insertOutboundsAfter(config.outbounds, EMBY_GROUP, [pikpak])
+  insertIntoSelectorAfter(config, 'GLOBAL', EMBY_GROUP, [PIKPAK_GROUP])
+  ensurePikPakRouteRule(config)
+}
+
+function ensurePikPakRouteRule (config) {
+  config.route =
+    config.route && typeof config.route === 'object' ? config.route : {}
+  config.route.rules = Array.isArray(config.route.rules)
+    ? config.route.rules
+    : []
+  if (
+    config.route.rules.some(
+      rule =>
+        rule &&
+        rule.outbound === PIKPAK_GROUP &&
+        Array.isArray(rule.domain_suffix) &&
+        rule.domain_suffix.includes(PIKPAK_DOMAIN_SUFFIX)
+    )
+  ) {
+    return
+  }
+
+  const rule = {
+    domain_suffix: [PIKPAK_DOMAIN_SUFFIX],
+    outbound: PIKPAK_GROUP
+  }
+  const index = config.route.rules.findIndex(
+    item => item && item.rule_set === 'geosite-youtube'
+  )
+  if (index === -1) {
+    config.route.rules.push(rule)
+    return
+  }
+  config.route.rules.splice(index, 0, rule)
 }
 
 function ensureExchangePolicy (config) {

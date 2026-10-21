@@ -88,6 +88,20 @@
       ]
     },
     {
+      "tag": "📹 PikPak",
+      "type": "selector",
+      "outbounds": [
+        "🚀 节点选择",
+        "🌐 全部节点",
+        "🇭🇰 香港",
+        "🇹🇼 台湾",
+        "🇯🇵 日本",
+        "🇸🇬 新加坡",
+        "🇺🇸 美国",
+        "🎯 全球直连"
+      ]
+    },
+    {
       "tag": "📹 YouTube",
       "type": "selector",
       "outbounds": [
@@ -295,6 +309,7 @@
         "🌐 全部节点",
         "🤖 AI",
         "📲 Telegram",
+        "📹 PikPak",
         "📹 YouTube",
         "🍀 Google",
         "👨‍💻 Github",
@@ -360,6 +375,10 @@
       {
         "rule_set": "geosite-ai",
         "outbound": "🤖 AI"
+      },
+      {
+        "domain_suffix": ["mypikpak.com"],
+        "outbound": "📹 PikPak"
       },
       {
         "rule_set": "geosite-youtube",
