@@ -8,8 +8,8 @@ const template = JSON.parse(read("../sing-box/1.13.x/config.json"));
 const PIKPAK = "📹 PikPak";
 const EMBY = "🎬 Emby";
 const YOUTUBE = "📹 YouTube";
-const LANDING = "🛬 落地节点";
 const nodeNames = ["香港测试", "美国落地测试"];
+const markedNames = ["[普通]香港测试", "[机场]机场测试", "[落地]美国落地测试"];
 
 async function renderSingBox(args, input = template) {
   const content = await runInNewContext(`(async () => {
@@ -19,7 +19,7 @@ async function renderSingBox(args, input = template) {
     $arguments: { name: "test", ...args },
     $content: JSON.stringify(input),
     produceArtifact: async () => ({
-      outbounds: nodeNames.map((tag) => ({
+      outbounds: markedNames.map((tag) => ({
         tag, type: "socks", server: "127.0.0.1", server_port: 1080,
       })),
     }),
@@ -47,7 +47,8 @@ describe("PikPak policy", () => {
         expect(globalNames.indexOf(EMBY)).toBeLessThan(globalNames.indexOf(PIKPAK));
         expect(globalNames.indexOf(PIKPAK)).toBeLessThan(globalNames.indexOf(YOUTUBE));
         expect(pikpak.outbounds.includes(nodeNames[0])).toBe(policyNodes === "all");
-        expect(pikpak.outbounds.includes(LANDING)).toBe(landing);
+        expect(pikpak.outbounds).toContain(nodeNames[1]);
+        expect(pikpak.outbounds).not.toContain("🛬 落地节点");
 
         const rules = config.route.rules.filter((rule) => rule.outbound === PIKPAK);
         expect(rules).toHaveLength(1);
@@ -60,25 +61,16 @@ describe("PikPak policy", () => {
 
   test("injects the group when the base template does not contain it", async () => {
     const config = await renderSingBox({ policyNodes: "none" }, {
-      outbounds: [
-        { tag: "📲 Telegram", type: "selector", outbounds: ["🎯 全球直连"] },
-        { tag: YOUTUBE, type: "selector", outbounds: ["🎯 全球直连"] },
-        { tag: "GLOBAL", type: "selector", outbounds: ["📲 Telegram", YOUTUBE] },
-        { tag: "🎯 全球直连", type: "direct" },
-      ],
-      route: { rules: [{ rule_set: "geosite-youtube", outbound: YOUTUBE }] },
+      ...template,
+      outbounds: template.outbounds.filter(item => item.tag !== PIKPAK)
     });
 
     expect(tags(config).filter((name) => name === PIKPAK)).toHaveLength(1);
     expect(config.route.rules.filter((rule) => rule.outbound === PIKPAK)).toHaveLength(1);
   });
 
-  test("repeated rendering does not duplicate PikPak objects", async () => {
+  test("repeated rendering rejects duplicate subscription tags", async () => {
     const once = await renderSingBox({});
-    const twice = await renderSingBox({}, once);
-
-    expect(tags(twice).filter((name) => name === PIKPAK)).toHaveLength(1);
-    expect(twice.outbounds.find((group) => group.tag === "GLOBAL").outbounds.filter((name) => name === PIKPAK)).toHaveLength(1);
-    expect(twice.route.rules.filter((rule) => rule.outbound === PIKPAK)).toHaveLength(1);
+    await expect(renderSingBox({}, once)).rejects.toThrow("节点 tag 重复");
   });
 });

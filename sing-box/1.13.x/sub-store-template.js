@@ -2,9 +2,9 @@
 // Usage arguments:
 // name=one
 // type=本地订阅
-// policyNodes=all|none, optional. Default none: all appends all nodes to policy selectors; none keeps policy selectors group-only.
-// landing=true|false, optional. Default false: enable landing/front-proxy groups and add detour to landing nodes.
-// chainFilter is optional. If landing=true, it overrides the default landing node regex.
+// policyNodes=all|none, optional. Default none: business selectors include
+// groups and individual landing nodes; all also includes ordinary/airport nodes.
+// Subscription nodes must start with [普通], [机场], or [落地].
 // embyRuleUrl is optional: defaults to this repository's source JSON rule-set; empty string: group only.
 // PikPak is always created and routes mypikpak.com, matching the mihomo template.
 // outbound is optional. If omitted, nodes are automatically grouped into common region selectors.
@@ -25,8 +25,11 @@ const POLICY_GROUP_CHOICES = [
   '🇺🇸 美国',
   '🎯 全球直连'
 ]
-const FRONT_PROXY_GROUP = '🔗 前置代理'
+const FRONT_PROXY_GROUP = '🛫 机场前置'
 const LANDING_GROUP = '🛬 落地节点'
+const OLD_FRONT_PROXY_GROUP = '🔗 前置代理'
+const PREVIOUS_FRONT_PROXY_GROUP = '机场前置'
+const NODE_MARKER = /^\[(普通|机场|落地)\]/
 const EMBY_GROUP = '🎬 Emby'
 const EMBY_RULE_SET = 'emby'
 const DEFAULT_EMBY_RULE_URL =
@@ -37,8 +40,6 @@ const EXCHANGE_GROUP = '💱 交易所'
 const EXCHANGE_RULE_SET = 'geosite-cryptocurrency'
 const EXCHANGE_RULE_SET_URL =
   'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-cryptocurrency.srs'
-const DEFAULT_LANDING_FILTER_SOURCE =
-  '家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|Minor'
 const REGION_RULES = [
   {
     name: '🇭🇰 香港',
@@ -88,14 +89,10 @@ async function renderSingBoxTemplate () {
     includeUnsupportedProxy,
     url,
     policyNodes,
-    landing,
-    chainFilter,
     embyRuleUrl = DEFAULT_EMBY_RULE_URL
   } = typeof $arguments !== 'undefined' ? $arguments : {}
   if (!name) throw new Error('missing argument: name')
   policyNodes = normalizePolicyNodes(policyNodes)
-  landing = parseBool(landing, false)
-  const landingRegex = landing ? createLandingRegex(chainFilter) : null
   if (!outbound) {
     outbound = DEFAULT_OUTBOUND
     log('missing argument: outbound, use default region grouping rules')
@@ -129,17 +126,23 @@ async function renderSingBoxTemplate () {
   const outbounds = Array.isArray(data.outbounds) ? data.outbounds : []
   const endpoints = Array.isArray(data.endpoints) ? data.endpoints : []
   const proxies = [...outbounds, ...endpoints]
-  applyLandingDetour(proxies, landingRegex)
+  const originalTags = proxies.map(proxy => proxy && proxy.tag)
+  config.outbounds = Array.isArray(config.outbounds) ? config.outbounds : []
+  const classified = classifyNodes(proxies, config)
+  normalizeTemplateReferences(config, originalTags, proxies)
+  const landingTags = classified.filter(item => item.category === '落地').map(item => item.proxy.tag)
+  const airportTags = classified.filter(item => item.category === '机场').map(item => item.proxy.tag)
   log(`loaded ${outbounds.length} outbounds, ${endpoints.length} endpoints`)
 
   const outboundRules = parseOutboundRules(outbound)
-  config.outbounds = Array.isArray(config.outbounds) ? config.outbounds : []
+  removeLegacyChainGroups(config)
   ensureExchangePolicy(config)
   ensureEmbyPolicy(config, embyRuleUrl)
   ensurePikPakPolicy(config)
 
   for (const outboundItem of config.outbounds) {
     if (!outboundItem || typeof outboundItem !== 'object') continue
+    if (outboundItem.type !== 'selector' && outboundItem.type !== 'urltest') continue
 
     for (const [outboundRegex, tagRegex] of outboundRules) {
       if (!outboundRegex.test(outboundItem.tag || '')) continue
@@ -150,8 +153,8 @@ async function renderSingBoxTemplate () {
       const tags = getTags(
         proxies,
         tagRegex,
-        shouldExcludeLanding(outboundItem.tag, landingRegex)
-          ? landingRegex
+        shouldExcludeLanding(outboundItem.tag)
+          ? new Set(landingTags)
           : null,
         outboundItem.tag
       )
@@ -161,17 +164,25 @@ async function renderSingBoxTemplate () {
     }
   }
 
-  if (landing) {
-    ensureLandingGroups(config, proxies, landingRegex)
-  }
-
   if (policyNodes === 'all') {
     appendAllNodesToPolicyGroups(config, getTags(proxies, DEFAULT_NODE_FILTER))
   } else {
-    log('policyNodes=none, keep policy selectors group-only')
+    log('policyNodes=none, keep ordinary/airport nodes behind group selectors')
   }
-  normalizePolicyGroupOrder(config, policyNodes, landing)
+  normalizePolicyGroupOrder(config, policyNodes, landingTags)
 
+  // Custom filters must not omit any classified node from the all-node selector.
+  for (const item of config.outbounds) {
+    if (item && item.tag === '🌐 全部节点' && item.type === 'selector') {
+      item.outbounds = unique([...(item.outbounds || []), ...proxies.map(proxy => proxy.tag)])
+    }
+  }
+  if (airportTags.length) {
+    insertOutboundsAfter(config.outbounds, EMBY_GROUP, [{
+      tag: FRONT_PROXY_GROUP, type: 'selector', outbounds: airportTags
+    }])
+    insertIntoSelectorAfter(config, 'GLOBAL', EMBY_GROUP, [FRONT_PROXY_GROUP])
+  }
   ensureNonEmptyMatchedOutbounds(config, outboundRules)
 
   config.outbounds.push(...outbounds)
@@ -179,6 +190,7 @@ async function renderSingBoxTemplate () {
     config.endpoints = Array.isArray(config.endpoints) ? config.endpoints : []
     config.endpoints.push(...endpoints)
   }
+  validateOutboundGraph(config)
 
   $content = JSON.stringify(config, null, 2)
   log('done')
@@ -238,6 +250,8 @@ function ensureNonEmptyMatchedOutbounds (config, outboundRules) {
 
   for (const outboundItem of config.outbounds) {
     if (!outboundItem || typeof outboundItem !== 'object') continue
+    if (outboundItem.type !== 'selector' && outboundItem.type !== 'urltest') continue
+    if (outboundItem.tag === FRONT_PROXY_GROUP) continue
 
     const matched = outboundRules.some(([outboundRegex]) =>
       outboundRegex.test(outboundItem.tag || '')
@@ -280,7 +294,7 @@ function ensureEmbyPolicy (config, ruleUrl) {
   ) || {
     tag: EMBY_GROUP,
     type: 'selector',
-    outbounds: getPolicyGroupChoices(false)
+    outbounds: getPolicyGroupChoices()
   }
   emby.type = 'selector'
   removeOutbounds(config.outbounds, [EMBY_GROUP])
@@ -335,12 +349,12 @@ function ensurePikPakPolicy (config) {
   ) || {
     tag: PIKPAK_GROUP,
     type: 'selector',
-    outbounds: getPolicyGroupChoices(false)
+    outbounds: getPolicyGroupChoices()
   }
   pikpak.type = 'selector'
   pikpak.outbounds = Array.isArray(pikpak.outbounds)
     ? pikpak.outbounds
-    : getPolicyGroupChoices(false)
+    : getPolicyGroupChoices()
   removeOutbounds(config.outbounds, [PIKPAK_GROUP])
   insertOutboundsAfter(config.outbounds, EMBY_GROUP, [pikpak])
   insertIntoSelectorAfter(config, 'GLOBAL', EMBY_GROUP, [PIKPAK_GROUP])
@@ -390,14 +404,14 @@ function ensureExchangePolicy (config) {
     exchange = {
       tag: EXCHANGE_GROUP,
       type: 'selector',
-      outbounds: getPolicyGroupChoices(false)
+      outbounds: getPolicyGroupChoices()
     }
     insertOutboundsAfter(outbounds, '💶 PayPal', [exchange])
   } else {
     exchange.type = 'selector'
     exchange.outbounds = Array.isArray(exchange.outbounds)
       ? exchange.outbounds
-      : getPolicyGroupChoices(false)
+      : getPolicyGroupChoices()
   }
 
   insertIntoSelectorAfter(config, 'GLOBAL', '💶 PayPal', [EXCHANGE_GROUP])
@@ -457,8 +471,8 @@ function ensureExchangeRuleSet (config) {
   config.route.rule_set.splice(index + 1, 0, ruleSet)
 }
 
-function normalizePolicyGroupOrder (config, policyNodes, landing) {
-  const policyGroupChoices = getPolicyGroupChoices(landing)
+function normalizePolicyGroupOrder (config, policyNodes, landingTags) {
+  const policyGroupChoices = getPolicyGroupChoices()
 
   for (const outboundItem of config.outbounds) {
     if (!outboundItem || outboundItem.type !== 'selector') continue
@@ -468,13 +482,13 @@ function normalizePolicyGroupOrder (config, policyNodes, landing) {
       ? outboundItem.outbounds
       : []
     if (policyNodes === 'none') {
-      outboundItem.outbounds = policyGroupChoices.slice()
+      outboundItem.outbounds = unique([...policyGroupChoices, ...landingTags])
       continue
     }
 
     const policyChoices = new Set(policyGroupChoices)
     const directNodes = outbounds.filter(tag => tag && !policyChoices.has(tag))
-    outboundItem.outbounds = unique([...policyGroupChoices, ...directNodes])
+    outboundItem.outbounds = unique([...policyGroupChoices, ...directNodes, ...landingTags])
   }
 }
 
@@ -487,72 +501,96 @@ function normalizePolicyNodes (value) {
   throw new Error('invalid argument: policyNodes must be all or none')
 }
 
-function parseBool (value, fallback) {
-  if (typeof value === 'undefined' || value === null || value === '')
-    return fallback
-  if (typeof value === 'boolean') return value
-  const normalized = String(value).trim().toLowerCase()
-  if (['true', '1', 'yes', 'on'].includes(normalized)) return true
-  if (['false', '0', 'no', 'off'].includes(normalized)) return false
-  throw new Error(`invalid boolean argument: ${value}`)
-}
-
-function createLandingRegex (chainFilter) {
-  const source = String(chainFilter || DEFAULT_LANDING_FILTER_SOURCE).trim()
-  try {
-    return new RegExp(source, 'i')
-  } catch (error) {
-    throw new Error(
-      `invalid argument: chainFilter is not valid regex: ${
-        error.message || error
-      }`
-    )
-  }
-}
-
-function applyLandingDetour (proxies, landingRegex) {
-  if (!landingRegex) return
-
-  for (const proxy of proxies) {
-    if (!proxy || typeof proxy !== 'object') continue
-    if (!landingRegex.test(proxy.tag || '')) continue
-    proxy.detour = FRONT_PROXY_GROUP
-  }
-}
-
-function ensureLandingGroups (config, proxies, landingRegex) {
-  if (!landingRegex) return
-
-  const landingTags = getTags(proxies, DEFAULT_NODE_FILTER, null).filter(tag =>
-    landingRegex.test(tag)
-  )
-  const frontTags = getTags(proxies, DEFAULT_NODE_FILTER, landingRegex)
-  const groups = [
-    {
-      tag: FRONT_PROXY_GROUP,
-      type: 'selector',
-      outbounds:
-        frontTags.length > 0
-          ? unique([...frontTags, '🎯 全球直连'])
-          : ['🎯 全球直连']
-    },
-    {
-      tag: LANDING_GROUP,
-      type: 'selector',
-      outbounds: landingTags.length > 0 ? landingTags : ['🎯 全球直连']
-    }
-  ]
-
-  removeOutbounds(config.outbounds, [FRONT_PROXY_GROUP, LANDING_GROUP])
-  insertOutboundsAfter(config.outbounds, EMBY_GROUP, groups)
-
-  insertIntoSelectorAfter(config, 'GLOBAL', EMBY_GROUP, [
-    FRONT_PROXY_GROUP,
-    LANDING_GROUP
+function classifyNodes (proxies, config) {
+  const reserved = new Set([
+    FRONT_PROXY_GROUP, OLD_FRONT_PROXY_GROUP, PREVIOUS_FRONT_PROXY_GROUP, LANDING_GROUP,
+    'COMPATIBLE',
+    ...config.outbounds.map(item => item && item.tag).filter(Boolean),
+    ...(Array.isArray(config.endpoints) ? config.endpoints.map(item => item && item.tag).filter(Boolean) : []),
+    EMBY_GROUP, PIKPAK_GROUP, EXCHANGE_GROUP
   ])
-  log(
-    `landing enabled: ${landingTags.length} landing node(s), ${frontTags.length} front node(s)`
-  )
+  const names = new Set()
+  const classified = []
+  for (const proxy of proxies) {
+    if (!proxy || typeof proxy !== 'object' || typeof proxy.tag !== 'string') {
+      throw new Error('订阅节点缺少有效的 tag')
+    }
+    const match = NODE_MARKER.exec(proxy.tag)
+    if (!match) throw new Error(`未分类订阅节点: ${proxy.tag}（必须以 [普通]、[机场] 或 [落地] 开头）`)
+    const tag = proxy.tag.slice(match[0].length).trim()
+    if (!tag) throw new Error(`分类前缀后节点 tag 为空: ${proxy.tag}`)
+    if (names.has(tag) || reserved.has(tag)) throw new Error(`节点 tag 重复或与策略组冲突: ${tag}`)
+    if (['direct', 'block', 'selector', 'urltest'].includes(proxy.type)) {
+      throw new Error(`订阅中包含非真实代理出站: ${proxy.tag}`)
+    }
+    names.add(tag)
+    proxy.tag = tag
+    if (match[1] === '落地') {
+      proxy.detour = FRONT_PROXY_GROUP
+    } else if (proxy.detour) {
+      throw new Error(`普通/机场节点已有前置依赖，无法保证独立连接: ${tag}`)
+    }
+    classified.push({ proxy, category: match[1] })
+  }
+  if (classified.some(item => item.category === '落地') &&
+      !classified.some(item => item.category === '机场')) {
+    throw new Error('存在 [落地] 节点但没有 [机场] 节点，不能生成机场前置')
+  }
+  return classified
+}
+
+function normalizeTemplateReferences (config, originalTags, proxies) {
+  const renamed = new Map(originalTags.map((tag, index) => [tag, proxies[index].tag]))
+  for (const item of config.outbounds) {
+    if (!item) continue
+    if (Array.isArray(item.outbounds)) item.outbounds = item.outbounds.map(tag => renamed.get(tag) || tag)
+    if (renamed.has(item.default)) item.default = renamed.get(item.default)
+    if (renamed.has(item.detour)) item.detour = renamed.get(item.detour)
+  }
+}
+
+function removeLegacyChainGroups (config) {
+  const obsolete = new Set([OLD_FRONT_PROXY_GROUP, PREVIOUS_FRONT_PROXY_GROUP, LANDING_GROUP])
+  for (const rule of (config.route && config.route.rules) || []) {
+    if (rule && obsolete.has(rule.outbound)) {
+      throw new Error(`旧链式策略组仍被路由规则引用: ${rule.outbound}`)
+    }
+  }
+  removeOutbounds(config.outbounds, [...obsolete])
+  // A previously generated front group is rebuilt exclusively from this
+  // artifact's airport nodes; never inherit its previous dynamic members.
+  removeOutbounds(config.outbounds, [FRONT_PROXY_GROUP])
+  for (const item of config.outbounds) {
+    if (item && Array.isArray(item.outbounds)) {
+      item.outbounds = item.outbounds.filter(tag => !obsolete.has(tag) && tag !== FRONT_PROXY_GROUP)
+    }
+    if (item && (obsolete.has(item.default) || item.default === FRONT_PROXY_GROUP)) delete item.default
+  }
+}
+
+function validateOutboundGraph (config) {
+  const entries = [...config.outbounds, ...(config.endpoints || [])]
+  const byTag = new Map()
+  for (const item of entries) {
+    if (!item || typeof item.tag !== 'string' || !item.tag) throw new Error('出站缺少有效 tag')
+    if (byTag.has(item.tag)) throw new Error(`出站 tag 重复: ${item.tag}`)
+    byTag.set(item.tag, item)
+  }
+  const visiting = new Set()
+  const visited = new Set()
+  function visit (tag) {
+    if (!byTag.has(tag)) throw new Error(`出站引用不存在的 tag: ${tag}`)
+    if (visiting.has(tag)) throw new Error(`出站/拨号依赖循环: ${tag}`)
+    if (visited.has(tag)) return
+    visiting.add(tag)
+    const item = byTag.get(tag)
+    for (const ref of [...(Array.isArray(item.outbounds) ? item.outbounds : []), ...(item.detour ? [item.detour] : [])]) {
+      visit(ref)
+    }
+    visiting.delete(tag)
+    visited.add(tag)
+  }
+  for (const tag of byTag.keys()) visit(tag)
 }
 
 function insertOutboundsAfter (outbounds, tag, items) {
@@ -601,17 +639,11 @@ function insertIntoSelectorAfter (config, tag, afterTag, values) {
   }
 }
 
-function getPolicyGroupChoices (landing) {
-  if (!landing) return POLICY_GROUP_CHOICES.slice()
-  return unique([
-    ...POLICY_GROUP_CHOICES.slice(0, -1),
-    LANDING_GROUP,
-    POLICY_GROUP_CHOICES[POLICY_GROUP_CHOICES.length - 1]
-  ])
+function getPolicyGroupChoices () {
+  return POLICY_GROUP_CHOICES.slice()
 }
 
-function shouldExcludeLanding (outboundTag, landingRegex) {
-  if (!landingRegex) return false
+function shouldExcludeLanding (outboundTag) {
   return /^(🇭🇰 香港|🇹🇼 台湾|🇯🇵 日本|🇸🇬 新加坡|🇺🇸 美国)$/.test(outboundTag || '')
 }
 
@@ -625,7 +657,7 @@ function getTags (proxies, regex, excludeRegex, outboundTag) {
       return regex.test(tag)
     })
     .map(proxy => proxy.tag)
-    .filter(tag => tag && !(excludeRegex && excludeRegex.test(tag)))
+    .filter(tag => tag && !(excludeRegex && excludeRegex.has(tag)))
 }
 
 function getKnownRegionTag (tag) {

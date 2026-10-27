@@ -2,23 +2,21 @@
  * Sub-Store mihomo 配置脚本（统一参数版）
  *
  * 支持参数：
- * - policyNodes=none|all，默认 none。all 会让业务策略组直接展示全部单节点。
- * - landing=true|false，默认 false。启用后识别落地节点并生成前置/落地分组。
- * - chainFilter=<正则>，landing=true 时可覆盖默认落地节点识别正则。
+ * - policyNodes=none|all，默认 none。落地节点始终可由业务策略组单独选择；
+ *   all 还会让业务策略组直接展示普通和机场节点。
+ * - 节点名称必须以 [普通]、[机场] 或 [落地] 开头；落地始终经过「🛫 机场前置」。
  * - embyRuleUrl=<直链>，可选，默认使用本仓库的 classical YAML 规则；空字符串时只创建 Emby 分组。
  *
  * 示例：
- * https://example.com/mihomo.js#policyNodes=all&landing=true
- * https://example.com/mihomo.js#landing=true&chainFilter=^Minor：|备用|落地
+ * https://example.com/mihomo.js#policyNodes=all
  */
 
-const FRONT_PROXY_GROUP = '🔗 前置代理';
-const LANDING_GROUP = '🛬 落地节点';
+const FRONT_PROXY_GROUP = '🛫 机场前置';
 const BACKGROUND_TEST_GROUP = '📊 延迟测试';
 const EXCHANGE_GROUP = '💱 交易所';
 const EMBY_GROUP = '🎬 Emby';
 const DEFAULT_EMBY_RULE_URL = 'https://gh-proxy.com/https://raw.githubusercontent.com/lengmoX/proxy-config/main/rules/emby/mihomo.yaml';
-const DEFAULT_LANDING_FILTER = '家宽|家庭宽带|商宽|商业宽带|星链|Starlink|落地|链式|Minor';
+const NODE_MARKER = /^\[(普通|机场|落地)\]/;
 const REGION_RULES = [
   { name: '🇭🇰 香港', flags: ['🇭🇰'], keywords: [/香港/i, /港/i, /\bHK\b/i, /Hong\s*Kong/i, /HongKong/i] },
   { name: '🇹🇼 台湾', flags: ['🇹🇼'], keywords: [/台湾/i, /台灣/i, /臺灣/i, /台/i, /\bTW\b/i, /Taiwan/i] },
@@ -31,8 +29,6 @@ function main(config) {
   const args = getArguments();
   return buildMihomoConfig(config, {
     policyNodes: normalizePolicyNodes(args.policyNodes),
-    landing: parseBool(args.landing, false),
-    chainFilter: args.chainFilter,
     embyRuleUrl: typeof args.embyRuleUrl === 'undefined' ? DEFAULT_EMBY_RULE_URL : args.embyRuleUrl,
   });
 }
@@ -49,34 +45,28 @@ function normalizePolicyNodes(value) {
   throw new Error(`invalid policyNodes: ${value}. Use none or all.`);
 }
 
-function parseBool(value, fallback) {
-  if (typeof value === 'undefined' || value === null || value === '') return fallback;
-  if (typeof value === 'boolean') return value;
-  const normalized = String(value).trim().toLowerCase();
-  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
-  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
-  throw new Error(`invalid boolean value: ${value}`);
-}
-
 function buildMihomoConfig(input, options) {
   const config = input && typeof input === 'object' ? input : {};
   const includePolicyNodes = options.policyNodes === 'all';
-  const chainRegex = options.landing ? createChainRegex(options.chainFilter || DEFAULT_LANDING_FILTER) : null;
-  const subscriptionProxies = normalizeProxies(Array.isArray(config.proxies) ? config.proxies.filter(Boolean) : [], chainRegex);
-  const nodeNames = unique(subscriptionProxies.map((proxy) => proxy && proxy.name).filter(Boolean));
+  const classified = classifyProxies(Array.isArray(config.proxies) ? config.proxies : []);
+  const subscriptionProxies = classified.map(({ proxy }) => proxy);
+  const nodeNames = classified.map(({ proxy }) => proxy.name);
+  const airportNames = classified.filter(({ category }) => category === '机场').map(({ proxy }) => proxy.name);
+  const landingNames = classified.filter(({ category }) => category === '落地').map(({ proxy }) => proxy.name);
   const selectableNodes = nodeNames.length > 0 ? nodeNames : ['直连'];
-  const chainGroups = createChainGroups(selectableNodes, chainRegex);
 
-  const regionGroups = createRegionGroups(selectableNodes, chainRegex);
+  const regionGroups = createRegionGroups(classified);
   const regionGroupNames = regionGroups.map((group) => group.name);
   const basePolicyChoices = unique([
     '🚀 默认代理',
     '🌐 全部节点',
     ...regionGroupNames,
-    chainGroups.enabled && LANDING_GROUP,
     '直连',
+    ...landingNames,
   ]);
   const policyChoices = includePolicyNodes ? unique([...basePolicyChoices, ...selectableNodes]) : basePolicyChoices;
+  const groups = createProxyGroups(selectableNodes, regionGroups, policyChoices, airportNames);
+  validateProxyGroups(groups, new Set([...nodeNames, '直连']));
 
   const result = {
     ...config,
@@ -111,7 +101,7 @@ function buildMihomoConfig(input, options) {
     sniffer: createSniffer(),
     tun: createTun(),
     dns: createDns(),
-    'proxy-groups': createProxyGroups(selectableNodes, regionGroups, policyChoices, chainGroups),
+    'proxy-groups': groups,
     rules: createRules(options.embyRuleUrl),
     'rule-providers': createRuleProviders(options.embyRuleUrl),
   };
@@ -119,37 +109,63 @@ function buildMihomoConfig(input, options) {
   return result;
 }
 
-function createChainRegex(source) {
-  const value = String(source || '').trim();
-  if (!value) return null;
-  try {
-    return new RegExp(value, 'i');
-  } catch (error) {
-    throw new Error(`invalid chainFilter regex: ${error.message || error}`);
+function classifyProxies(proxies) {
+  const classified = [];
+  const names = new Set();
+  const reserved = new Set([
+    '直连', FRONT_PROXY_GROUP, '🚀 默认代理', '🌐 全部节点',
+    BACKGROUND_TEST_GROUP, '🔄 订阅更新', '🎯 直连', '🍎 Apple',
+    '🤖 AI', '📲 Telegram', EMBY_GROUP, '📹 PikPak', '📹 YouTube',
+    '🍀 Google', '👨🏿‍💻 GitHub', '🐬 OneDrive', '🪟 Microsoft',
+    '🎵 TikTok', '🎥 NETFLIX', '✈️ Speedtest', '💶 PayPal',
+    EXCHANGE_GROUP, '🐟 漏网之鱼', ...REGION_RULES.map((region) => region.name),
+  ]);
+  for (const input of proxies) {
+    if (!input || typeof input !== 'object' || typeof input.name !== 'string') {
+      throw new Error('订阅节点缺少有效的 name');
+    }
+    const match = NODE_MARKER.exec(input.name);
+    if (!match) throw new Error(`未分类订阅节点: ${input.name}（必须以 [普通]、[机场] 或 [落地] 开头）`);
+    const name = input.name.slice(match[0].length).trim();
+    if (!name) throw new Error(`分类前缀后节点名称为空: ${input.name}`);
+    if (names.has(name) || reserved.has(name)) throw new Error(`节点名称重复或与策略组冲突: ${name}`);
+    if (input.type === 'direct' || input.type === 'reject' || input.type === 'select' || input.type === 'url-test') {
+      throw new Error(`订阅中包含非真实代理节点: ${input.name}`);
+    }
+    names.add(name);
+    const proxy = { ...input, name };
+    if (match[1] === '落地') {
+      proxy['dialer-proxy'] = FRONT_PROXY_GROUP;
+    } else if (proxy['dialer-proxy']) {
+      throw new Error(`普通/机场节点已有前置依赖，无法保证独立连接: ${name}`);
+    }
+    classified.push({ proxy, category: match[1] });
   }
+  if (classified.some(({ category }) => category === '落地') &&
+      !classified.some(({ category }) => category === '机场')) {
+    throw new Error('存在 [落地] 节点但没有 [机场] 节点，不能生成机场前置');
+  }
+  return classified;
 }
 
-function normalizeProxies(proxies, chainRegex) {
-  return proxies.map((proxy) => {
-    if (!proxy || typeof proxy !== 'object') return proxy;
-    if (!chainRegex || !chainRegex.test(proxy.name || '')) return proxy;
-    return { ...proxy, 'dialer-proxy': FRONT_PROXY_GROUP };
-  });
-}
-
-function createChainGroups(nodeNames, chainRegex) {
-  if (!chainRegex) return { enabled: false, groups: [] };
-
-  const landingNodes = nodeNames.filter((name) => chainRegex.test(name));
-  const frontNodes = nodeNames.filter((name) => !chainRegex.test(name));
-
-  return {
-    enabled: true,
-    groups: [
-      { name: FRONT_PROXY_GROUP, type: 'select', proxies: frontNodes.length > 0 ? frontNodes : ['直连'] },
-      { name: LANDING_GROUP, type: 'select', proxies: landingNodes.length > 0 ? landingNodes : ['🌐 全部节点', '直连'] },
-    ],
-  };
+function validateProxyGroups(groups, availableNodes) {
+  const byName = new Map(groups.map((group) => [group.name, group]));
+  for (const group of groups) {
+    for (const ref of group.proxies) {
+      if (!availableNodes.has(ref) && !byName.has(ref)) throw new Error(`策略组 ${group.name} 引用不存在的节点/组: ${ref}`);
+    }
+  }
+  const visiting = new Set();
+  const visited = new Set();
+  function visit(name) {
+    if (visiting.has(name)) throw new Error(`策略组循环引用: ${name}`);
+    if (visited.has(name)) return;
+    visiting.add(name);
+    for (const ref of byName.get(name).proxies) if (byName.has(ref)) visit(ref);
+    visiting.delete(name);
+    visited.add(name);
+  }
+  for (const name of byName.keys()) visit(name);
 }
 
 function ensureDirectProxy(proxies) {
@@ -169,12 +185,11 @@ function unique(values) {
   });
 }
 
-function createRegionGroups(nodeNames, chainRegex) {
+function createRegionGroups(classified) {
   return REGION_RULES.map((region) => {
-    const matched = nodeNames.filter((name) => {
-      if (chainRegex && chainRegex.test(name)) return false;
-      return getRegionName(name) === region.name;
-    });
+    const matched = classified.filter(({ proxy, category }) =>
+      category !== '落地' && getRegionName(proxy.name) === region.name
+    ).map(({ proxy }) => proxy.name);
     return {
       name: region.name,
       type: 'select',
@@ -215,7 +230,7 @@ function getFirstRegionFlagMatch(value) {
   return firstMatch;
 }
 
-function createProxyGroups(nodeNames, regionGroups, policyChoices, chainGroups) {
+function createProxyGroups(nodeNames, regionGroups, policyChoices, airportNames) {
   const allNodeGroup = { name: '🌐 全部节点', type: 'select', proxies: nodeNames };
   const backgroundTestGroup = {
     name: BACKGROUND_TEST_GROUP,
@@ -235,7 +250,7 @@ function createProxyGroups(nodeNames, regionGroups, policyChoices, chainGroups) 
     policy('🤖 AI'),
     policy('📲 Telegram'),
     policy(EMBY_GROUP),
-    ...chainGroups.groups,
+    ...(airportNames.length ? [{ name: FRONT_PROXY_GROUP, type: 'select', proxies: airportNames }] : []),
     { name: '🔄 订阅更新', type: 'select', proxies: ['直连', '🚀 默认代理'] },
     policy('📹 PikPak'),
     policy('📹 YouTube'),

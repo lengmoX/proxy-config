@@ -9,6 +9,7 @@ const template = JSON.parse(read("../sing-box/1.13.x/config.json"));
 const EMBY = "🎬 Emby";
 const TELEGRAM = "📲 Telegram";
 const nodeNames = ["香港测试", "美国落地测试"];
+const markedNames = ["[普通]香港测试", "[机场]机场测试", "[落地]美国落地测试"];
 
 async function renderSingBox(args, input = template) {
   const content = await runInNewContext(`(async () => {
@@ -18,7 +19,7 @@ async function renderSingBox(args, input = template) {
     $arguments: { name: "test", ...args },
     $content: JSON.stringify(input),
     produceArtifact: async () => ({
-      outbounds: nodeNames.map((tag) => ({
+      outbounds: markedNames.map((tag) => ({
         tag, type: "socks", server: "127.0.0.1", server_port: 1080,
       })),
     }),
@@ -31,7 +32,7 @@ function renderMihomo(args) {
   return runInNewContext(`${mihomoSource}\nmain(input)`, {
     $arguments: args,
     input: {
-      proxies: nodeNames.map((name) => ({
+      proxies: markedNames.map((name) => ({
         name, type: "socks5", server: "127.0.0.1", port: 1080,
       })),
     },
@@ -65,7 +66,8 @@ describe("Emby policy", () => {
           const mihomoChoices = mihomo["proxy-groups"].find((group) => group.name === EMBY).proxies;
           for (const choices of [singChoices, mihomoChoices]) {
             expect(choices.includes(nodeNames[0])).toBe(policyNodes === "all");
-            expect(choices.includes("🛬 落地节点")).toBe(landing);
+            expect(choices).toContain(nodeNames[1]);
+            expect(choices).not.toContain("🛬 落地节点");
           }
           expect(singChoices).toContain("🎯 全球直连");
           expect(mihomoChoices).toContain("直连");
@@ -87,18 +89,17 @@ describe("Emby policy", () => {
     }
   }
 
-  test("sing-box repeated rendering does not duplicate Emby objects", async () => {
+  test("sing-box refuses duplicate subscription nodes on repeated rendering", async () => {
     const args = { embyRuleUrl: "https://example.com/emby.json", landing: true };
-    const config = await renderSingBox(args, await renderSingBox(args));
-    expectAfterTelegram(config.outbounds.map((group) => group.tag));
-    expectAfterTelegram(config.outbounds.find((group) => group.tag === "GLOBAL").outbounds);
-    expect(config.route.rules.filter((rule) => rule.rule_set === "emby")).toHaveLength(1);
-    expect(config.route.rule_set.filter((rule) => rule.tag === "emby")).toHaveLength(1);
+    await expect(renderSingBox(args, await renderSingBox(args))).rejects.toThrow("节点 tag 重复");
   });
 
   test("sing-box preserves existing Emby rules when URL is disabled", async () => {
     const original = await renderSingBox({ embyRuleUrl: "https://example.com/emby.json" });
-    const config = await renderSingBox({ embyRuleUrl: "" }, original);
+    const config = await renderSingBox({ embyRuleUrl: "" }, {
+      ...original,
+      outbounds: original.outbounds.filter(item => !["香港测试", "机场测试", "美国落地测试"].includes(item.tag))
+    });
     expect(config.route.rules.filter((rule) => rule.rule_set === "emby")).toHaveLength(1);
     expect(config.route.rule_set.find((rule) => rule.tag === "emby").url).toBe("https://example.com/emby.json");
   });
